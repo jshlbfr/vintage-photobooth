@@ -1,6 +1,7 @@
 export const PHOTO_COUNTS = [1, 2, 4, 6] as const;
 export type PhotoCount = (typeof PHOTO_COUNTS)[number];
 export const TIMERS = [3, 5, 10] as const;
+export type TimerSeconds = (typeof TIMERS)[number];
 
 export const FRAME_COLORS = [
   { name: "Vanilla", value: "#F4EBDD" },
@@ -23,29 +24,27 @@ export const FRAME_COLORS = [
 
 // Preview-only CSS treatments. Production image processing belongs to milestone 5.
 export const FILTER_PREVIEWS = [
-  { name: "Golden hour", css: "sepia(.85) saturate(.8) contrast(1.08)" },
-  { name: "Old soul", css: "sepia(.75) saturate(.5) contrast(1.12) brightness(.88)" },
-  { name: "Faded diary", css: "sepia(.55) saturate(.4) contrast(.95)" },
-  { name: "Sunday", css: "sepia(.35) saturate(.5) contrast(1.08)" },
-  { name: "Silver screen", css: "grayscale(1) contrast(1.08)" },
-  { name: "After hours", css: "grayscale(1) contrast(1.25) brightness(.85)" },
-  { name: "Soft focus", css: "grayscale(.85) contrast(.85)" },
-  { name: "Warm memory", css: "sepia(.5) saturate(.75) brightness(1.08)" },
+  { id: "golden-hour", name: "Golden hour", css: "sepia(.85) saturate(.8) contrast(1.08)" },
+  { id: "old-soul", name: "Old soul", css: "sepia(.75) saturate(.5) contrast(1.12) brightness(.88)" },
+  { id: "faded-diary", name: "Faded diary", css: "sepia(.55) saturate(.4) contrast(.95)" },
+  { id: "sunday", name: "Sunday", css: "sepia(.35) saturate(.5) contrast(1.08)" },
+  { id: "silver-screen", name: "Silver screen", css: "grayscale(1) contrast(1.08)" },
+  { id: "after-hours", name: "After hours", css: "grayscale(1) contrast(1.25) brightness(.85)" },
+  { id: "soft-focus", name: "Soft focus", css: "grayscale(.85) contrast(.85)" },
+  { id: "warm-memory", name: "Warm memory", css: "sepia(.5) saturate(.75) brightness(1.08)" },
 ] as const;
+
+export type FilterId = (typeof FILTER_PREVIEWS)[number]["id"];
+export type FrameColor = (typeof FRAME_COLORS)[number]["value"];
 
 export const SAMPLE_PORTRAIT = "/images/sample-portrait.jpg";
 
 export const STICKERS = [
   "camera", "heart", "sunglasses", "sparkle",
   "record", "good-photos", "cherries", "strip",
-  "flower", "star", "photo-booth", "smile",
+  "dog", "star", "photo-booth", "smile",
   "bow", "hearts", "dice", "memories",
 ] as const;
 export type StickerKind = (typeof STICKERS)[number];
 
-export const FRAME_STYLES = [
-  { id: "classic", name: "Classic strip", radius: 10 },
-  { id: "square", name: "The archive", radius: 0 },
-  { id: "soft", name: "Soft corners", radius: 24 },
-] as const;
-export type FrameStyle = (typeof FRAME_STYLES)[number]["id"];
+export { FRAME_STYLES, type FrameStyle } from "./frame-templates";

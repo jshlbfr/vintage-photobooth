@@ -6,8 +6,8 @@ export function Button({ className = "", children, ...props }: ButtonHTMLAttribu
   return <button className={`button ${className}`} {...props}>{children}</button>;
 }
 
-export function ActionLink({ href, children, className = "", arrow = true }: { href: string; children: ReactNode; className?: string; arrow?: boolean }) {
-  return <Link href={href} className={`button ${className}`}>{children}{arrow && <Icon name="arrow-right" />}</Link>;
+export function ActionLink({ href, children, className = "", arrow = true, onNavigate }: { href: string; children: ReactNode; className?: string; arrow?: boolean; onNavigate?: () => void }) {
+  return <Link href={href} className={`button ${className}`} onNavigate={onNavigate}>{children}{arrow && <Icon name="arrow-right" />}</Link>;
 }
 
 export function BackLink({ href, label = "Go back", className = "" }: { href: string; label?: string; className?: string }) {

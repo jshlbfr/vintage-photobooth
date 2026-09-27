@@ -1,8 +1,9 @@
 # Vintage Photobooth
 
-Milestone 1: a responsive visual foundation based on the five reference exports
-in `references/figma/`. All photographs are local sample assets. The Figma page
-screenshots are never loaded by the application.
+Milestone 2: one in-memory client session connects the photobooth flow, with
+supplied Figma artwork and nine generated frame styles. All current captures
+are explicitly sample images. See [the milestone report](docs/milestone-2.md).
+Reference screenshots are never rendered as the interface.
 
 ## Local development
 
@@ -17,49 +18,65 @@ binding, use `npm run dev -- --webpack`.
 
 | Route | Visual preview |
 | --- | --- |
-| `/` | Landing and replaceable vintage collage |
+| `/` | Landing with supplied vintage collage artwork |
 | `/camera` | Setup controls and sample portrait |
 | `/capture` | Filter thumbnails, sample countdown, adaptive strip |
 | `/customize` | Frame/color previews and sticker/text controls |
 | `/print` | 1.8-second printing transition to Results |
 | `/results` | Finished sample strip and action hierarchy |
 
-Controls use **page-local demo state**. Setup values and customization do not
-carry between routes yet. The photo-count selector on Capture demonstrates
-1/2/4/6 layouts. Frame colors and frame styles can be previewed on Customize.
-Links allow reviewing the screens; full session/navigation behavior belongs to
-Milestone 2. Print and Results display a fixed decorated sample composition.
+START creates a fresh session. Choose **1 / 2 / 4 / 6 photos only in Camera
+Setup**, then Continue to prepare that many sample captures. Device, mirror,
+timer, flash, filter, frame and color selections persist through client-side
+navigation. Capture, Customize, Print and Results render the same composition.
+Edit Again preserves everything; Take Another resets to defaults at Camera.
+
+State lives in memory. Refreshing a later step or opening it directly without
+an active capture set redirects to Camera Setup. Opening Camera directly
+initializes defaults. Back links preserve the active session. Separate tabs
+have separate sessions.
 
 Capture, upload, sticker/text editing, download, GIF, Live Moment, and QR controls
 are intentionally unavailable. There is no camera/microphone access, capture,
-media export, storage, backend, session persistence, or advertising provider.
+media export, persistent storage, backend, or advertising provider.
 Print never invokes browser or physical printing. Reduced motion skips the
 animation and shortens the transition.
 
 ## Architecture
 
 - `app/globals.css`: design tokens, shared styles, and responsive reflow.
-- `app/layout.tsx`: metadata and replaceable font variables. Poppins is the UI
-  font; Playfair Display and Allura are temporary display/script fonts.
+- `app/layout.tsx`: metadata, ambient artwork and font variables. Poppins is the
+  UI font; Playfair Display and Allura are approved for Results and remain
+  temporary substitutes on Landing pending a licensed Forward Serif web font.
 - `components/ui/`: shared controls, panels, and icons.
-- `components/screens/`: presentation and page-local preview interactions.
+- `components/screens/`: rendering and typed session interactions.
+- `components/session/`: Context/reducer provider, fresh-session START link and
+  route guard. Provider wraps page children in the root layout so navigation
+  through Landing also preserves state until START is pressed.
+- `lib/session/`: types, defaults, action union, pure reducer, one sample-capture
+  factory and selectors. Future media is represented by lightweight references.
 - `components/photobooth/photo-strip.tsx`: the single SVG strip renderer used by
-  Capture, Customize, Print, Results, and the sample collage.
-- `lib/composition.ts`: count-aware strip geometry and centered cover-crop math,
-  ready for a later rendering pipeline. No DOM screenshot export.
+  the picker, Capture, Customize, Print and Results.
+- `lib/frame-templates.ts`: canonical logical-pixel geometry, nine generated
+  templates, and the future asset-template contract with per-count variants.
+- `lib/composition.ts`: shared presentation model and crop
+  math for a later rendering pipeline. No DOM screenshot export.
 - `lib/design-data.ts`: frame colors/styles and eight original preview looks.
   CSS treatments are placeholders for later production filter processing.
-- `components/artwork/`: replaceable original placeholder illustrations.
+- `components/artwork/` and `lib/artwork.ts`: supplied decorative assets and
+  actual stickers with responsive Next.js image handling.
 - `public/images/README.md`: sample photograph sources and licensing reference.
 
-The `(booth)` layout leaves room for the later client session provider. A future
-`app/share/[id]` route can be introduced separately from the private booth flow.
+The `(booth)` layout applies the session guard. A future `app/share/[id]` route
+can remain outside the private booth flow. Custom PNG frames remain untouched
+and unused. Sticker/text state is typed but editing controls remain disabled.
 
 ## Validation
 
 ```bash
 npm run lint
 ./node_modules/.bin/tsc --noEmit
+node --test tests/frame-templates.test.mjs tests/session.test.mjs
 npm run build
 ```
 
@@ -67,4 +84,7 @@ When Turbopack's port binding is unavailable: `npm run build -- --webpack`.
 Google Fonts are downloaded at build time and then self-hosted by Next.js;
 building requires access to Google Fonts. No application dependencies were added.
 
-See `docs/milestone-1.md` for visual differences, asset needs, and later scope.
+Tests use native TypeScript stripping and a local import-resolution hook,
+validated on Node 24. No test runner package was added. The earlier milestone
+reports remain historical references; `docs/milestone-2.md` records current
+behavior and validation.
