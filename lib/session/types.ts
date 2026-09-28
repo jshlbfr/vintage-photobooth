@@ -7,9 +7,10 @@ export type CameraPreferences = {
   photoCount: PhotoCount;
   timerSeconds: TimerSeconds;
   flash: boolean;
+  audioEnabled: boolean;
 };
 
-/** Future local resources are references into a browser-owned media store.
+/** Local resources are references into a browser-owned media store.
  * Blobs, streams and object-URL lifecycle do not belong in React state. */
 export type MediaReference =
   | { kind: "sample"; src: string; width: number; height: number }
@@ -19,7 +20,8 @@ export type Capture = {
   id: string;
   source: "sample" | "camera" | "upload";
   still: MediaReference;
-  motion?: { media: MediaReference; durationMs: number };
+  motion?: { media: MediaReference; durationMs: number; hasAudio: boolean; mirrored: boolean; crop: { x: number; y: number; width: number; height: number } };
+  mirrorApplied?: boolean;
   capturedAt: number;
   filterAtCapture: FilterId;
 };
@@ -53,6 +55,7 @@ export type PhotoBoothSession = {
   id: string;
   createdAt: number;
   preferences: CameraPreferences;
+  capturePlanReady: boolean;
   captures: readonly Capture[];
   customization: Customization;
   rewards: { enhancedFeaturesUnlocked: boolean };

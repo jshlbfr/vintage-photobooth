@@ -4,18 +4,18 @@ import { getStripLayout, type StripComposition } from "@/lib/composition";
 import { getFrameTemplate } from "@/lib/frame-templates";
 
 /** One view for capture, customize, print, results, and decorative sample strips. */
-export function PhotoStrip({ composition, empty = false, className = "", label = "Sample photostrip" }: { composition: StripComposition; empty?: boolean; className?: string; label?: string }) {
+export function PhotoStrip({ composition, empty = false, className = "", label = "Your photostrip" }: { composition: StripComposition; empty?: boolean; className?: string; label?: string }) {
   const id = useId().replace(/:/g, "");
   const layout = getStripLayout(composition);
   const template = getFrameTemplate(composition.frameStyle);
   const artwork = template.kind === "asset" ? template.variants[composition.count] : undefined;
   const frameImage = artwork && <image href={artwork.asset} width={layout.width} height={layout.height} />;
-  return <svg className={`photo-strip ${className}`} viewBox={`0 0 ${layout.width} ${layout.height}`} role="img" aria-label={`${label}, ${composition.count} photos`}>
+  return <svg className={`photo-strip strip-preview ${className}`} viewBox={`0 0 ${layout.width} ${layout.height}`} role="img" aria-label={`${label}, ${composition.count} photos`}>
     <rect width={layout.width} height={layout.height} rx={layout.radius} fill={composition.frameColor} />
     {artwork?.layer === "background" && frameImage}
     {layout.slots.map((slot, index) => <g key={index}>
       <defs><clipPath id={`${id}-slot-${index}`}><rect {...slot} rx={slot.radius} /></clipPath></defs>
-      <rect {...slot} rx={slot.radius} fill={empty ? "#FFFBEA" : "#050403"} />
+      <rect {...slot} rx={slot.radius} fill={empty || !composition.photos[index]?.src ? "#e7ddc8" : "#050403"} />
       {!empty && composition.photos[index]?.src && <g clipPath={`url(#${id}-slot-${index})`}>
         <image href={composition.photos[index].src} {...slot} preserveAspectRatio={composition.photos[index].fit === "contain" ? "xMidYMid meet" : "xMidYMid slice"} style={{ filter: composition.filter }} />
         <rect {...slot} fill="#4a2c12" opacity=".08" />

@@ -1,6 +1,6 @@
 import { FILTER_PREVIEWS } from "../design-data";
 import { getStripLayout, type StripComposition } from "../composition";
-import type { PhotoBoothSession } from "./types";
+import type { MediaReference, PhotoBoothSession } from "./types";
 
 export function hasCompleteCaptures(session: PhotoBoothSession): boolean {
   return session.captures.length === session.preferences.photoCount;
@@ -11,12 +11,12 @@ export function selectFilter(session: PhotoBoothSession) {
 }
 
 /** Every screen consumes this selector, never its own sample arrays or defaults.
- * Local media resolution will be injected by the future browser media store. */
-export function selectStripComposition(session: PhotoBoothSession): StripComposition {
+ * The browser media store resolves local references into shared object URLs. */
+export function selectStripComposition(session: PhotoBoothSession, resolveMedia?: (reference: MediaReference) => string | undefined): StripComposition {
   const composition: StripComposition = {
     count: session.preferences.photoCount,
     photos: session.captures.map((capture, index) => ({
-      src: capture.still.kind === "sample" ? capture.still.src : undefined,
+      src: resolveMedia ? resolveMedia(capture.still) : capture.still.kind === "sample" ? capture.still.src : undefined,
       alt: `${capture.source === "sample" ? "Sample p" : "P"}hotograph ${index + 1}`,
       fit: capture.source === "sample" ? "contain" : "cover",
     })),

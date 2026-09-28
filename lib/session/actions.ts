@@ -1,6 +1,6 @@
 import type { FilterId, FrameColor, PhotoCount, TimerSeconds } from "../design-data";
 import type { FrameStyle } from "../frame-templates";
-import type { GeneratedOutput, OutputKind, PhotoBoothSession, PlacedSticker, PlacedText } from "./types";
+import type { Capture, GeneratedOutput, OutputKind, PhotoBoothSession, PlacedSticker, PlacedText } from "./types";
 
 export type SessionAction =
   | { type: "session/start" | "session/ensure"; session: PhotoBoothSession }
@@ -9,7 +9,10 @@ export type SessionAction =
   | { type: "camera/count"; count: PhotoCount }
   | { type: "camera/timer"; seconds: TimerSeconds }
   | { type: "camera/flash"; enabled: boolean }
-  | { type: "captures/prepare-samples"; timestamp: number }
+  | { type: "camera/audio"; enabled: boolean }
+  | { type: "captures/begin" }
+  | { type: "captures/restart" }
+  | { type: "captures/add"; sessionId: string; capture: Capture }
   | { type: "customization/filter"; filterId: FilterId }
   | { type: "customization/frame"; frameId: FrameStyle }
   | { type: "customization/color"; color: FrameColor }

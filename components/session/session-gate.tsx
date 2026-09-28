@@ -10,7 +10,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const setup = pathname === "/camera";
-  const ready = Boolean(session && (setup || hasCompleteCaptures(session)));
+  const ready = Boolean(session && (setup || (pathname === "/capture" ? session.capturePlanReady : hasCompleteCaptures(session))));
 
   useEffect(() => {
     if (ready) return;

@@ -8,13 +8,19 @@ const { hasCompleteCaptures, selectStripComposition } = await import("../lib/ses
 const { FRAME_STYLES } = await import("../lib/frame-templates.ts");
 const { FRAME_COLORS, FILTER_PREVIEWS } = await import("../lib/design-data.ts");
 const fresh = () => createSession("session-a", 1000);
+const capture = id => ({ id, source: "camera", still: { kind: "local", resourceId: id, mimeType: "image/jpeg", width: 1920, height: 1080 }, capturedAt: 2000, filterAtCapture: "old-soul" });
+const fill = session => {
+  session = reduce(session, { type: "captures/begin" });
+  for (let i = session.captures.length; i < session.preferences.photoCount; i++) session = reduce(session, { type: "captures/add", sessionId: session.id, capture: capture(`photo-${i}`) });
+  return session;
+};
 
 for (const count of [1, 2, 4, 6]) {
   test(`${count} photos: setup is the sole count source through the entire composition`, () => {
     let session = reduce(fresh(), { type: "camera/count", count });
     assert.equal(session.captures.length, 0);
     assert.equal(hasCompleteCaptures(session), false);
-    session = reduce(session, { type: "captures/prepare-samples", timestamp: 2000 });
+    session = fill(session);
     assert.equal(hasCompleteCaptures(session), true);
     assert.equal(session.captures.length, count);
     assert.equal(new Set(session.captures.map(capture => capture.id)).size, count);
@@ -25,7 +31,7 @@ for (const count of [1, 2, 4, 6]) {
       assert.equal(composition.photos.length, count);
       assert.equal(composition.frameStyle, template.id);
     }
-    assert.equal(reduce(session, { type: "captures/prepare-samples", timestamp: 3000 }), session, "back/continue preserves captures");
+    assert.deepEqual(fill(session).captures, session.captures, "back/continue preserves captures");
   });
 }
 
@@ -34,7 +40,7 @@ test("preferences, filter, geometry and all colors survive unrelated changes", (
   for (const action of [
     { type: "camera/count", count: 6 }, { type: "camera/device", deviceId: "sample-rear" },
     { type: "camera/mirror", mirrored: false }, { type: "camera/timer", seconds: 10 },
-    { type: "camera/flash", enabled: false }, { type: "captures/prepare-samples", timestamp: 2000 },
+    { type: "camera/flash", enabled: false }, { type: "captures/begin" },
     { type: "customization/frame", frameId: "wide" },
   ]) session = reduce(session, action);
   const captures = session.captures;
@@ -49,21 +55,21 @@ test("preferences, filter, geometry and all colors survive unrelated changes", (
       assert.equal(session.captures, captures);
     }
   }
-  assert.deepEqual(session.preferences, { photoCount: 6, deviceId: "sample-rear", mirrored: false, timerSeconds: 10, flash: false });
+  assert.deepEqual(session.preferences, { photoCount: 6, deviceId: "sample-rear", mirrored: false, timerSeconds: 10, flash: false, audioEnabled: false });
 });
 
 test("changing count invalidates old captures/outputs and re-prepares exactly the new count", () => {
-  let session = reduce(fresh(), { type: "captures/prepare-samples", timestamp: 1000 });
+  let session = fill(fresh());
   session = reduce(session, { type: "outputs/record", kind: "photo", output: { resourceId: "test", mimeType: "image/png", createdAt: 2000 } });
   session = reduce(session, { type: "camera/count", count: 1 });
   assert.equal(hasCompleteCaptures(session), false);
   assert.deepEqual(session.outputs, {});
-  session = reduce(session, { type: "captures/prepare-samples", timestamp: 3000 });
+  session = fill(session);
   assert.equal(session.captures.length, 1);
 });
 
 test("a fresh session clears customization, media references, rewards and outputs", () => {
-  let session = reduce(fresh(), { type: "captures/prepare-samples", timestamp: 2000 });
+  let session = fill(fresh());
   session = reduce(session, { type: "customization/stickers", stickers: [{ id: "s", assetId: "heart", x: .2, y: .3, size: .2, rotation: 4, layer: 1 }] });
   session = reduce(session, { type: "customization/texts", texts: [{ id: "t", content: "Memory", x: .5, y: .9, size: .06, rotation: 0, layer: 2, color: "#fff", font: "display", alignment: "middle" }] });
   session = reduce(session, { type: "rewards/unlock" });
@@ -105,4 +111,29 @@ test("ensure is idempotent and invalid selections cannot corrupt a session", () 
     { type: "customization/color", color: "not-a-color" },
     { type: "customization/filter", filterId: "missing" },
   ]) assert.equal(reduce(session, action), session);
+});
+
+
+test("capture guards reject stale sessions, duplicate IDs, unconfirmed plans and overflow", () => {
+  const add = { type: "captures/add", sessionId: "session-a", capture: capture("one") };
+  const initial = fresh();
+  assert.equal(reduce(initial, add), initial);
+  let session = reduce(initial, { type: "captures/begin" });
+  assert.equal(session.captures.length, 0, "continue never fabricates images");
+  assert.equal(reduce(session, { ...add, sessionId: "old-session" }), session);
+  session = reduce(session, add);
+  assert.equal(reduce(session, add), session);
+  session = fill(session);
+  assert.equal(reduce(session, { ...add, capture: capture("overflow") }), session);
+  const restarted = reduce(session, { type: "captures/restart" });
+  assert.deepEqual(restarted.preferences, session.preferences);
+  assert.deepEqual(restarted.captures, []);
+  assert.equal(restarted.capturePlanReady, true);
+});
+
+test("composition resolves shared local references without duplicating images", () => {
+  const session = fill(fresh());
+  const composition = selectStripComposition(session, ref => `blob:local/${ref.resourceId}`);
+  assert.equal(composition.photos[0].src, "blob:local/photo-0");
+  assert.equal(selectStripComposition(session).photos[0].src, undefined);
 });

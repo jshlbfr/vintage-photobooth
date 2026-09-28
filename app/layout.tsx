@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Allura, Playfair_Display, Poppins } from "next/font/google";
 import { AmbientBackground } from "@/components/artwork/ambient-background";
 import { SessionProvider } from "@/components/session/session-provider";
+import { MediaProvider } from "@/components/media/media-provider";
 import "./globals.css";
 
 const uiFont = Poppins({
@@ -37,7 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${uiFont.variable} ${displayFont.variable} ${scriptFont.variable}`}
     >
-      <body><AmbientBackground /><a className="skip-link" href="#main-content">Skip to content</a><SessionProvider>{children}</SessionProvider></body>
+      <body><AmbientBackground /><a className="skip-link" href="#main-content">Skip to content</a><SessionProvider><MediaProvider>{children}</MediaProvider></SessionProvider></body>
     </html>
   );
 }

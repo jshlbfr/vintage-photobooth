@@ -7,14 +7,14 @@ import { Sticker } from "@/components/artwork/sticker";
 import { PhotoStrip } from "@/components/photobooth/photo-strip";
 import { FramePicker } from "@/components/photobooth/frame-picker";
 import { usePhotoBoothSession } from "@/components/session/session-provider";
-import { selectStripComposition } from "@/lib/session/selectors";
+import { useStripComposition } from "@/components/media/media-provider";
 import { FRAME_COLORS, FRAME_STYLES, STICKERS } from "@/lib/design-data";
 
 export function CustomizeScreen() {
   const { session, dispatch } = usePhotoBoothSession();
   const color = session.customization.frameColor;
   const frame = FRAME_STYLES.findIndex(entry => entry.id === session.customization.frameId);
-  const composition = selectStripComposition(session);
+  const composition = useStripComposition();
 
   return <Panel className="workspace-panel customize-panel" labelledBy="customize-title">
     <header className="panel-heading customize-heading"><BackLink href="/capture" label="Back to capture preview" /><h1 id="customize-title">Customize Your Photo</h1><p>Choose a frame. Change Color. Add stickers. Add text.</p></header>
@@ -22,8 +22,8 @@ export function CustomizeScreen() {
     <div className="customize-tools">
       <fieldset className="color-fieldset"><legend>Frame Color</legend><div className="color-palette">{FRAME_COLORS.map((swatch) => <button key={swatch.name} type="button" className="color-swatch" style={{ backgroundColor: swatch.value }} aria-label={swatch.name} title={swatch.name} aria-pressed={color === swatch.value} onClick={() => dispatch({ type: "customization/color", color: swatch.value })}>{color === swatch.value && <span className="swatch-check"><Icon name="check" /></span>}</button>)}</div></fieldset>
       <fieldset className="sticker-fieldset"><legend>Stickers</legend><div className="sticker-palette">{STICKERS.map((kind) => <button type="button" key={kind} disabled title="Sticker editing is coming in the customization milestone" aria-label={`${kind.replaceAll("-", " ")} sticker (preview only)`}><Sticker kind={kind} /></button>)}</div></fieldset>
-      <Button className="add-text" disabled title="Text editing is coming in the customization milestone"><Icon name="text" />Add Text</Button>
     </div>
+    <Button className="add-text" disabled title="Text editing is coming in the customization milestone"><Icon name="text" />Add Text</Button>
     <div className="customize-preview"><PhotoStrip composition={composition} /></div>
     <ActionLink href="/print" className="print-action">Print</ActionLink>
   </Panel>;

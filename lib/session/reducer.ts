@@ -1,6 +1,5 @@
 import { FILTER_PREVIEWS, FRAME_COLORS, PHOTO_COUNTS, TIMERS } from "../design-data";
 import { FRAME_STYLES, supportsPhotoCount } from "../frame-templates";
-import { createSampleCaptures } from "./sample-captures";
 import type { SessionAction } from "./actions";
 import type { Customization, PhotoBoothSession } from "./types";
 
@@ -28,14 +27,17 @@ export function sessionReducer(session: PhotoBoothSession | null, action: Sessio
       return {
         ...session, preferences: { ...session.preferences, photoCount: action.count },
         // A different capture plan cannot keep an old, mismatched strip/output.
-        captures: [], outputs: {},
+        capturePlanReady: false, captures: [], outputs: {},
         customization: { ...session.customization, frameId: frame && supportsPhotoCount(frame, action.count) ? frame.id : "classic" },
       };
     }
-    case "captures/prepare-samples":
-      // Re-entering Capture with an unchanged count preserves capture identity.
-      return session.captures.length === session.preferences.photoCount ? session
-        : { ...session, captures: createSampleCaptures(session, action.timestamp), outputs: {} };
+    case "camera/audio":
+      return { ...session, preferences: { ...session.preferences, audioEnabled: action.enabled } };
+    case "captures/begin": return { ...session, capturePlanReady: true };
+    case "captures/restart": return { ...session, captures: [], outputs: {} };
+    case "captures/add":
+      if (action.sessionId !== session.id || !session.capturePlanReady || session.captures.length >= session.preferences.photoCount || session.captures.some(capture => capture.id === action.capture.id)) return session;
+      return { ...session, captures: [...session.captures, action.capture], outputs: {} };
     case "customization/filter":
       return FILTER_PREVIEWS.some(filter => filter.id === action.filterId) ? customize(session, { filterId: action.filterId }) : session;
     case "customization/frame": {
