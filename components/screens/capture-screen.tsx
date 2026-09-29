@@ -42,7 +42,7 @@ export function CaptureScreen() {
       <FilterPicker value={session.customization.filterId} onChange={(filterId) => dispatch({ type: "customization/filter", filterId })} disabled={capture.busy} />
     </div>
     <div className="capture-strip"><PhotoStrip composition={composition} label="Your captured photostrip" /></div>
-    <ol className="capture-instructions">{instructions.map((step, index) => <li key={step.title}><h2><span>{index + 1}</span>{step.title}</h2><p>{step.description}</p></li>)}</ol>
+    <ol className="capture-instructions">{instructions.map((step, index) => <li key={step.title}><h2><span className="instruction-badge"><b>{index + 1}</b></span>{step.title}</h2><p>{step.description}</p></li>)}</ol>
     {capture.complete && !capture.busy ? <ActionLink href="/customize" className="choose-frame" onNavigate={camera.stop}>Choose Frame</ActionLink> : <Button className="choose-frame" disabled>Choose Frame <Icon name="arrow-right" /></Button>}
   </Panel></>;
 }

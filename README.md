@@ -4,6 +4,8 @@ Milestone 4 adds manual/continuous capture with Pause/Resume, full-viewport
 photographic flash, eight photo counts and a non-destructive Canvas filter engine.
 Camera photos, optional audio and motion remain local in the browser.
 See [the milestone report](docs/milestone-4.md).
+Follow-up [capture and layout refinements](docs/capture-refinements.md) improve
+live filter responsiveness, flash illumination timing and Customize spacing.
 Reference screenshots are never rendered as the interface.
 
 ## Local development
@@ -66,7 +68,7 @@ motion skips the animation; both modes require clicking See Your Photos.
 - `lib/session/`: types, defaults, action union, pure reducer and selectors.
   Captures store lightweight references into a browser-owned Blob/URL store.
 - `lib/filters/` and `components/filters/`: typed photographic presets, shared
-  pixel processing, scaled live preview and reference-counted derived previews.
+  pixel processing, a frame-scheduled worker preview and reference-counted derived previews.
 - `lib/media/`: camera controller, Blob ownership, accurate cancellable countdown,
   source-resolution Canvas still/upload processing and short MediaRecorder clips.
 - `components/media/`: route/session cleanup provider, video preview and capture hook.

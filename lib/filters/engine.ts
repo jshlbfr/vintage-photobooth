@@ -65,7 +65,7 @@ export function processPixels(data: Uint8ClampedArray, width: number, height: nu
   return data;
 }
 /** Same pixel engine at any requested resolution; callers choose their preview budget. */
-export function gradeCanvas(canvas: HTMLCanvasElement, id: FilterId, seed = 17) {
+export function gradeCanvas(canvas: HTMLCanvasElement | OffscreenCanvas, id: FilterId, seed = 17) {
   if(id==='original')return;
   const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)return;
   const frame=ctx.getImageData(0,0,canvas.width,canvas.height);

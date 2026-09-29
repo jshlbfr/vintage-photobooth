@@ -1,5 +1,8 @@
 # Milestone 4 — capture sequences, expanded strips and photographic filters
 
+This report records the original milestone. See [subsequent refinements](capture-refinements.md)
+for updated live-preview processing, flash timing and layout behavior.
+
 Completed in the existing project without new packages. Media remains local.
 No custom frame PNGs, final exports, editor expansion, ads, QR/backend, or
 Milestone 5 work was added.

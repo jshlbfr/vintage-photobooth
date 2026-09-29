@@ -22,11 +22,9 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
   const operation=useRef<AbortController|null>(null);
   const mounted=useRef(false), pauseRequested=useRef(false);
   const recorder=useRef<ReturnType<typeof beginMotion>>(null);
-  const flashTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const transition=(next:Phase)=>{phaseRef.current=next;if(mounted.current)setPhase(next);};
   const cancel=useCallback(()=>{
     operation.current?.abort();recorder.current?.cancel();recorder.current=null;
-    if(flashTimer.current)clearTimeout(flashTimer.current);
   },[]);
   useEffect(()=>{
     mounted.current=true;
@@ -60,18 +58,21 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
         controller.signal.throwIfAborted();
         if(element.readyState<2||!element.videoWidth)throw new Error('The camera is warming up. Try again in a moment.');
         transition('capturing');
-        const flashStarted=performance.now();
         if(session.preferences.flash){
           flushSync(()=>setFlash(true));
-          flashTimer.current=setTimeout(()=>{if(mounted.current)setFlash(false);},150);
           await afterPaint(controller.signal);
+          // Give the illuminated camera scene time to reach the incoming video.
+          await wait(60,controller.signal);
         }
         controller.signal.throwIfAborted();
         const timestamp=Date.now();
         // Read the raw video, never the HTML flash or the filtered preview canvas.
-        const still=await captureStill(element,session.preferences.mirrored);
+        const [still]=await Promise.all([
+          captureStill(element,session.preferences.mirrored),
+          session.preferences.flash ? wait(80,controller.signal) : Promise.resolve(),
+        ]);
+        if(session.preferences.flash)setFlash(false);
         controller.signal.throwIfAborted();
-        if(session.preferences.flash)await wait(Math.max(0,150-(performance.now()-flashStarted)),controller.signal);
         let motion:Capture['motion'];
         const activeRecorder=recorder.current;
         if(activeRecorder){
@@ -90,7 +91,6 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
     } finally {
       for(const reference of allocated)if(reference.kind==='local')store.release(reference.resourceId);
       recorder.current?.cancel();recorder.current=null;
-      if(flashTimer.current)clearTimeout(flashTimer.current);
       operation.current=null;
       if(mounted.current){setCountdown(null);setFlash(false);transition(count>=session.preferences.photoCount?'complete':pauseRequested.current?'paused':'idle');}
     }
