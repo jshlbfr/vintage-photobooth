@@ -1,4 +1,5 @@
-import type { PhotoCount, StickerKind, FilterId } from "./design-data";
+import type { PlacedSticker, PlacedText } from "./session/types";
+import type { PhotoCount, FilterId } from "./design-data";
 import { getFrameTemplate, resolveFrameLayout } from "./frame-templates";
 
 /** Presentation geometry, shared by every strip. No media or session lifecycle here. */
@@ -8,11 +9,8 @@ export type StripComposition = {
   frameColor: string;
   frameStyle: string;
   caption?: string;
-  texts?: readonly {
-    id: string; content: string; x: number; y: number; size: number; rotation: number;
-    font: "ui" | "display" | "script"; color: string; alignment: "start" | "middle" | "end";
-  }[];
-  decorations?: readonly { kind: StickerKind; x: number; y: number; size: number; rotation: number }[];
+  texts?: readonly PlacedText[];
+  decorations?: readonly PlacedSticker[];
 };
 
 export function getStripLayout(composition: Pick<StripComposition, "count" | "caption" | "frameStyle">) {

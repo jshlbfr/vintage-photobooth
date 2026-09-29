@@ -38,6 +38,7 @@ export function sessionReducer(session: PhotoBoothSession | null, action: Sessio
     case "captures/add":
       if (action.sessionId !== session.id || !session.capturePlanReady || session.captures.length >= session.preferences.photoCount || session.captures.some(capture => capture.id === action.capture.id)) return session;
       return { ...session, captures: [...session.captures, action.capture], outputs: {} };
+    case "customization/replace": return customize(session, action.customization);
     case "customization/filter":
       return FILTER_PREVIEWS.some(filter => filter.id === action.filterId) ? customize(session, { filterId: action.filterId }) : session;
     case "customization/frame": {

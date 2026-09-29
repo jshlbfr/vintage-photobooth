@@ -58,18 +58,19 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
         controller.signal.throwIfAborted();
         if(element.readyState<2||!element.videoWidth)throw new Error('The camera is warming up. Try again in a moment.');
         transition('capturing');
+        const flashStarted=performance.now();
         if(session.preferences.flash){
           flushSync(()=>setFlash(true));
           await afterPaint(controller.signal);
           // Give the illuminated camera scene time to reach the incoming video.
-          await wait(60,controller.signal);
+          await wait(Math.max(0,120-(performance.now()-flashStarted)),controller.signal);
         }
         controller.signal.throwIfAborted();
         const timestamp=Date.now();
         // Read the raw video, never the HTML flash or the filtered preview canvas.
         const [still]=await Promise.all([
           captureStill(element,session.preferences.mirrored),
-          session.preferences.flash ? wait(80,controller.signal) : Promise.resolve(),
+          session.preferences.flash ? wait(Math.max(0,400-(performance.now()-flashStarted)),controller.signal) : Promise.resolve(),
         ]);
         if(session.preferences.flash)setFlash(false);
         controller.signal.throwIfAborted();

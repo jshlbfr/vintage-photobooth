@@ -1,17 +1,22 @@
+"use client";
+
 import { FilteredPhoto } from "@/components/filters/filtered-image";
-import { useId } from "react";
-import { StripSticker } from "@/components/artwork/sticker";
+import { useEffect, useId, useState, type ReactNode, type Ref, type PointerEventHandler } from "react";
+import { DecorationArt } from "@/components/editor/decoration-art";
+import { orderedElements } from "@/lib/editor/geometry";
 import { getStripLayout, type StripComposition } from "@/lib/composition";
 import { getFrameTemplate } from "@/lib/frame-templates";
 
 /** One view for capture, customize, print, results, and decorative sample strips. */
-export function PhotoStrip({ composition, empty = false, className = "", label = "Your photostrip" }: { composition: StripComposition; empty?: boolean; className?: string; label?: string }) {
+export function PhotoStrip({ composition, empty = false, className = "", label = "Your photostrip", editorLayer, svgRef, onPointerDown }: { editorLayer?: ReactNode; svgRef?: Ref<SVGSVGElement>; onPointerDown?: PointerEventHandler<SVGSVGElement>; composition: StripComposition; empty?: boolean; className?: string; label?: string }) {
+  const [,fontsReady]=useState(false);
+  useEffect(()=>{let active=true;void document.fonts.ready.then(()=>{if(active)fontsReady(true);});return()=>{active=false;};},[]);
   const id = useId().replace(/:/g, "");
   const layout = getStripLayout(composition);
   const template = getFrameTemplate(composition.frameStyle);
   const artwork = template.kind === "asset" ? template.variants[composition.count] : undefined;
   const frameImage = artwork && <image href={artwork.asset} width={layout.width} height={layout.height} />;
-  return <svg className={`photo-strip strip-preview ${className}`} data-columns={new Set(layout.slots.map(slot => slot.x)).size} viewBox={`0 0 ${layout.width} ${layout.height}`} role="img" aria-label={`${label}, ${composition.count} photos`}>
+  return <svg ref={svgRef} onPointerDown={onPointerDown} className={`photo-strip strip-preview ${editorLayer?'is-editable':''} ${className}`} data-columns={new Set(layout.slots.map(slot => slot.x)).size} viewBox={`0 0 ${layout.width} ${layout.height}`} role={editorLayer ? "group" : "img"} aria-label={`${label}, ${composition.count} photos`}>
     <rect width={layout.width} height={layout.height} rx={layout.radius} fill={composition.frameColor} />
     {artwork?.layer === "background" && frameImage}
     {layout.slots.map((slot, index) => <g key={index}>
@@ -22,8 +27,9 @@ export function PhotoStrip({ composition, empty = false, className = "", label =
       </g>}
     </g>)}
     {artwork?.layer === "overlay" && frameImage}
-    {!empty && composition.decorations?.map((decoration, index) => <g key={index} transform={`translate(${decoration.x * layout.width} ${decoration.y * layout.height}) rotate(${decoration.rotation} ${decoration.size / 2} ${decoration.size / 2})`}><StripSticker kind={decoration.kind} size={decoration.size} /></g>)}
+    <defs><clipPath id={`${id}-frame`}><rect width={layout.width} height={layout.height} rx={layout.radius} /></clipPath></defs>
+    {!empty && <g clipPath={`url(#${id}-frame)`}>{orderedElements(composition).map(element=><g key={element.id} data-decoration-id={element.id} transform={`translate(${element.x*layout.width} ${element.y*layout.height}) rotate(${element.rotation})`}><DecorationArt element={element} layout={layout} /></g>)}</g>}
     {composition.caption && layout.captionY !== undefined && <text x={layout.width / 2} y={layout.captionY} textAnchor="middle" className="strip-caption" fill="#F3E9D2">{composition.caption}</text>}
-    {composition.texts?.map(text => <text key={text.id} x={text.x * layout.width} y={text.y * layout.height} fontSize={text.size * layout.width} fontFamily={`var(--font-${text.font})`} fill={text.color} textAnchor={text.alignment} transform={`rotate(${text.rotation} ${text.x * layout.width} ${text.y * layout.height})`}>{text.content}</text>)}
+    {editorLayer}
   </svg>;
 }

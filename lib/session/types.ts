@@ -26,7 +26,8 @@ export type Capture = {
   filterAtCapture: FilterId;
 };
 
-/** Positions and sizes are normalized to the strip, independent of DOM size. */
+/** x/y are centers normalized to strip width/height. Size is sticker width or
+ * text font size divided by strip width. Rotation is degrees; layers interleave. */
 type PlacedElement = {
   id: string;
   x: number;

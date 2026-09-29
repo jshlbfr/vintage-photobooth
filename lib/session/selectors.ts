@@ -1,4 +1,4 @@
-import { getStripLayout, type StripComposition } from "../composition";
+import { type StripComposition } from "../composition";
 import type { MediaReference, PhotoBoothSession } from "./types";
 
 export function hasCompleteCaptures(session: PhotoBoothSession): boolean {
@@ -19,12 +19,9 @@ export function selectStripComposition(session: PhotoBoothSession, resolveMedia?
     frameStyle: session.customization.frameId,
     frameColor: session.customization.frameColor,
   };
-  const layout = getStripLayout(composition);
   return {
     ...composition,
-    decorations: [...session.customization.stickers].sort((a, b) => a.layer - b.layer).map(sticker => ({
-      kind: sticker.assetId, x: sticker.x, y: sticker.y, size: sticker.size * layout.width, rotation: sticker.rotation,
-    })),
+    decorations: session.customization.stickers,
     texts: [...session.customization.texts].sort((a, b) => a.layer - b.layer),
   };
 }

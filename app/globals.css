@@ -518,3 +518,51 @@ a.result-action:hover { background: #eadcc0; }
 }
 
 .capture-instructions .instruction-badge b { display: block; font: inherit; text-box-trim: trim-both; text-box-edge: cap alphabetic; }
+
+/* Composition editor: controls stay outside the rendered strip. */
+.customize-workspace { width: 100%; display: flex; justify-content: center; }
+.editor-history { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+.editor-history button, .editor-inspector button, .editor-inspector select { border: 1px solid var(--line); border-radius: 7px; background: var(--cream); color: var(--ink); font: inherit; padding: 6px 10px; }
+.editor-history button { font-size: 11px; padding: 3px 12px; }
+.editor-history button:disabled { opacity: .4; }
+.editor-inspector { grid-column: 1; grid-row: 2; z-index: 2; align-self: center; background: var(--cream); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; max-height: 100%; overflow-y: auto; font-size: 12px; }
+.editor-inspector-heading, .editor-fields, .editor-nudge, .text-colors { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.editor-inspector label { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.editor-fields > * { flex: 1; min-width: 0; }
+.editor-inspector textarea { width: 100%; resize: vertical; max-height: 120px; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; background: #fff9ee; color: var(--ink); }
+.editor-inspector input { width: 100%; accent-color: #625842; }
+.editor-inspector output { display: inline; }
+.editor-inspector .editor-delete { color: #702C2B; }
+.editor-inspector .text-colors button { width: 28px; height: 28px; flex: 0 0 28px; padding: 0; border-radius: 50%; color: #bd9449; text-shadow: 0 0 2px #000; }
+.editor-nudge button { flex: 1; min-height: 32px; }
+.editor-object, .editor-handle { touch-action: none; cursor: grab; }
+.editor-object:active, .editor-handle:active { cursor: grabbing; }
+.editor-object:focus-visible { outline: none; stroke: #b65a33; stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.editor-handle.resize { cursor: nwse-resize; }
+.editor-layer { filter: none; }
+.photo-strip.is-editable { touch-action: none; }
+.customize-preview .photo-strip { overflow: visible; }
+@media (min-width: 801px) {
+  .customize-panel { grid-template-rows: 90px minmax(0,1fr) 44px; }
+  .customize-panel.is-editing .frame-carousel { visibility: hidden; }
+}
+@media (max-width: 800px) {
+  .customize-panel { grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto auto auto auto auto; }
+  .customize-heading, .customize-tools, .frame-picker, .customize-preview, .editor-inspector, .add-text, .print-action { grid-column: 1; }
+  .customize-preview { grid-row: 2; position: relative; top: auto; height: min(68svh,640px); width: 100%; align-self: center; }
+  .frame-picker { grid-row: 3; max-width: 100%; }
+  .frame-carousel { height: 150px; flex: none; }
+  .frame-template { max-width: 100px; height: 100%; display: flex; align-items: center; }
+  .frame-template .photo-strip { height: 100%; max-height: 100%; }
+  .frame-selection { flex-basis: 28px; }
+  .editor-inspector { grid-row: 3; align-self: stretch; max-height: none; }
+  .customize-panel.is-editing .frame-picker { visibility: hidden; }
+  .customize-tools { grid-row: 4; }
+  .add-text { grid-row: 5; }
+  .print-action { grid-row: 6; position: static; }
+  .customize-tools .color-palette { grid-template-columns: repeat(4,40px); gap: 14px; }
+  .customize-tools .color-swatch { width: 40px; height: 40px; }
+  .customize-tools .sticker-palette { grid-template-columns: repeat(4,48px); gap: 8px; }
+  .customize-tools .sticker-palette button { width: 48px; height: 48px; }
+  .editor-history button, .editor-inspector button, .editor-inspector select { min-height: 36px; }
+}
