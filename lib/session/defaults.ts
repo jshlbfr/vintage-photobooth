@@ -8,7 +8,7 @@ export function createSession(id: string, createdAt: number): PhotoBoothSession 
     preferences: { deviceId: "", mirrored: true, photoCount: 4, timerSeconds: 3, flash: true, audioEnabled: false },
     capturePlanReady: false,
     captures: [],
-    customization: { filterId: FILTER_PREVIEWS[1].id, frameId: "classic", frameColor: FRAME_COLORS[3].value, stickers: [], texts: [] },
+    customization: { filterId: FILTER_PREVIEWS[0].id, frameId: "classic", frameColor: FRAME_COLORS[3].value, stickers: [], texts: [] },
     rewards: { enhancedFeaturesUnlocked: false },
     outputs: {},
   };

@@ -14,8 +14,8 @@ export function BackLink({ href, label = "Go back", className = "" }: { href: st
   return <Link href={href} className={`icon-button back-link ${className}`} aria-label={label}><Icon name="arrow-left" /></Link>;
 }
 
-export function Switch({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
-  return <button className="switch" type="button" role="switch" aria-label={label} aria-checked={checked} onClick={() => onChange(!checked)}><span /></button>;
+export function Switch({ checked, onChange, label, disabled = false }: { checked: boolean; onChange: (checked: boolean) => void; label: string; disabled?: boolean }) {
+  return <button className="switch" type="button" role="switch" disabled={disabled} aria-label={label} aria-checked={checked} onClick={() => onChange(!checked)}><span /></button>;
 }
 
 export function SegmentedControl<T extends string | number>({ label, values, value, onChange, suffix = "" }: { label: string; values: readonly T[]; value: T; onChange: (value: T) => void; suffix?: string }) {

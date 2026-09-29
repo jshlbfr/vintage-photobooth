@@ -42,7 +42,7 @@ export type AssetFrameTemplate = {
 export type FrameTemplate = GeneratedFrameTemplate | AssetFrameTemplate;
 
 const base = {
-  kind: "generated", supportedPhotoCounts: [1, 2, 4, 6],
+  kind: "generated", supportedPhotoCounts: [1, 2, 4, 5, 6, 8, 10, 12],
   width: 224, sidePadding: 14, topPadding: 14, bottomPadding: 14,
   photoGap: 18, photoRadius: 8, frameRadius: 10, fourPhotoRatio: 166 / 196,
 } as const;
@@ -78,21 +78,20 @@ export function resolveFrameLayout(template: FrameTemplate, count: PhotoCount, c
   if (!supportsPhotoCount(template, count)) throw new RangeError(`${template.id} does not support ${count} photos.`);
   if (template.kind === "asset") return template.variants[count]!.layout;
 
-  // Six photos use shorter windows and compact gutters, not four-photo slots
-  // repeated six times. One photo is deliberately portrait-oriented.
-  const compact = count === 6;
-  const side = template.sidePadding * (compact ? .85 : 1);
-  const top = template.topPadding * (compact ? .75 : 1);
-  const bottom = Math.max(template.bottomPadding * (compact ? .75 : 1), caption ? 56 : 0);
-  const gap = template.photoGap * (compact ? .65 : 1);
+  const columns = count >= 6 ? 2 : 1;
+  const rows = count / columns;
+  const side = template.sidePadding;
+  const top = template.topPadding;
+  const bottom = Math.max(template.bottomPadding, caption ? 56 : 0);
+  const gap = template.photoGap;
   const photoWidth = template.width - side * 2;
-  const photoHeight = compact ? Math.min(photoWidth * .6, 124)
-    : photoWidth * (count === 1 ? 4 / 3 : count === 2 ? 1.08 : template.fourPhotoRatio);
-  const height = top + count * photoHeight + (count - 1) * gap + bottom;
+  const photoHeight = photoWidth * (count === 1 ? 4 / 3 : count === 2 ? 1.08 : template.fourPhotoRatio);
+  const width = side * 2 + columns * photoWidth + (columns - 1) * gap;
+  const height = top + rows * photoHeight + (rows - 1) * gap + bottom;
   return {
-    width: template.width, height, radius: template.frameRadius,
+    width, height, radius: template.frameRadius,
     slots: Array.from({ length: count }, (_, index) => ({
-      x: side, y: top + index * (photoHeight + gap), width: photoWidth, height: photoHeight,
+      x: side + (index % columns) * (photoWidth + gap), y: top + Math.floor(index / columns) * (photoHeight + gap), width: photoWidth, height: photoHeight,
       radius: template.photoRadius,
     })),
     ...(caption ? { captionY: height - bottom / 2 + 5 } : {}),

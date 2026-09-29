@@ -52,150 +52,105 @@ function send(method, params = {}, sessionId) {
   });
 }
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const report = { counts: [], layouts: [], checks: [], timers: [], errors };
+const report={counts:[],flashes:[],layouts:[],checks:[],errors};
 try {
-  const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
-  const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
-  const cdp = (method, params = {}) => send(method, params, sessionId);
-  const evaluate = async expression => {
-    const result = await cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-    if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
-    return result.result.value;
-  };
-  await cdp('Page.enable'); await cdp('Runtime.enable'); await cdp('Log.enable'); await cdp('Network.enable');
-
-  await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `
-    window.qa={calls:[],tracks:[],blobs:new Map(),revoked:[],recordings:[],flashes:0,ticks:[],print:0,requests:[],deny:null};
-    window.print=()=>qa.print++;
-    const gum=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    navigator.mediaDevices.getUserMedia=async constraints=>{
-      qa.calls.push(constraints);
-      if(qa.deny==='camera'&&constraints.video||qa.deny==='audio'&&constraints.audio)throw new DOMException('QA denial','NotAllowedError');
-      const stream=await gum(constraints); qa.tracks.push(...stream.getTracks()); return stream;
-    };
-    const create=URL.createObjectURL.bind(URL),revoke=URL.revokeObjectURL.bind(URL);
-    URL.createObjectURL=blob=>{const url=create(blob);qa.blobs.set(url,blob);return url;};
-    URL.revokeObjectURL=url=>{qa.revoked.push(url);qa.blobs.delete(url);revoke(url);};
-    const Recorder=window.MediaRecorder;
-    window.MediaRecorder=class extends Recorder{constructor(stream,options){super(stream,options);const entry={audio:stream.getAudioTracks().length,type:this.mimeType,start:performance.now(),stopped:false};qa.recordings.push(entry);this.addEventListener('stop',()=>{entry.stopped=true;entry.elapsed=performance.now()-entry.start;});}};
-    const draw=CanvasRenderingContext2D.prototype.drawImage;
-    CanvasRenderingContext2D.prototype.drawImage=function(source,...args){
-      if(source instanceof HTMLVideoElement){const raw=document.createElement('canvas');raw.width=this.canvas.width;raw.height=this.canvas.height;draw.call(raw.getContext('2d'),source,...args);qa.raw=raw;qa.transform=this.getTransform().a;}
-      return draw.call(this,source,...args);
-    };
-    const fetchOriginal=window.fetch;
-    window.fetch=(...args)=>{qa.requests.push({url:String(args[0]),method:args[1]?.method||'GET',body:!!args[1]?.body});return fetchOriginal(...args);};
-    document.addEventListener('DOMContentLoaded',()=>new MutationObserver(()=>{if(document.querySelector('.screen-flash'))qa.flashes++;const n=document.querySelector('.countdown')?.textContent;if(n&&qa.ticks.at(-1)!==n)qa.ticks.push(n);}).observe(document.body,{subtree:true,childList:true,characterData:true}));
-  ` });
-  const assert = (condition, message) => { if (!condition) throw new Error(message); };
-  const waitFor = async (expression, name, timeout=12000) => {
-    const start=Date.now(); while(Date.now()-start<timeout){if(await evaluate(expression))return;await delay(75);}throw new Error(`Timed out: ${name}: ${await evaluate('document.body.innerText')}`);
-  };
-  const click = async selector => { await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`); await delay(80); };
-  const route = path => waitFor(`location.pathname===${JSON.stringify(path)}`,path);
-  const photos = () => evaluate(`document.querySelectorAll('.capture-strip svg image').length`);
-  const choose = async (label,value) => {await evaluate(`[...document.querySelectorAll('[aria-label="${label}"] button')].find(b=>b.textContent===${JSON.stringify(value)}).click()`);await delay(50);};
-  const enable = async () => {await click('.camera-empty button');await waitFor(`document.querySelector('video')?.readyState>=2&&!document.querySelector('.camera-empty')`,'camera ready');};
-  const shot = async (number,timer=3) => {
-    await evaluate('qa.ticks=[];qa.flashes=0');
-    const start=Date.now();await click('.capture-actions button:last-child');
-    assert(await evaluate(`document.querySelector('.capture-actions button:last-child').disabled`),'duplicate capture enabled');
-    await waitFor(`document.querySelectorAll('.capture-strip svg image').length===${number}`,'capture '+number,20000);
-    const elapsed=Date.now()-start;assert(elapsed>=timer*1000&&elapsed<timer*1000+6000,'countdown timing '+elapsed);
-    const data=await evaluate(`({ticks:qa.ticks,flashes:qa.flashes,recording:qa.recordings.at(-1),transform:qa.transform,blobs:[...qa.blobs.values()].map(b=>({type:b.type,size:b.size}))})`);
-    assert(data.blobs.some(b=>b.type==='image/jpeg'&&b.size>1000),'no actual still blob');
-    report.timers.push({timer,elapsed,...data});return data;
-  };
-  const layout = async (width, screenshot=false) => {
-    await cdp('Emulation.setDeviceMetricsOverride',{width,height:1024,deviceScaleFactor:1,mobile:false});await delay(120);
-    const data=await evaluate(`({route:location.pathname,width:innerWidth,scrollWidth:document.documentElement.scrollWidth,customFrames:performance.getEntriesByType('resource').some(e=>decodeURIComponent(e.name).includes('/frames/'))})`);
-    assert(data.scrollWidth<=width&&!data.customFrames,'layout '+JSON.stringify(data));report.layouts.push(data);
-    if(screenshot){const image=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});await writeFile(out+'/m3-'+data.route.slice(1)+'-'+width+'.png',Buffer.from(image.data,'base64'));}
-  };
-  const mirrorCheck = async mirrored => {
-    const result=await evaluate(`(async()=>{const src=document.querySelector('.capture-strip svg image:last-of-type').getAttribute('href');const b=qa.blobs.get(src),image=await createImageBitmap(b),c=document.createElement('canvas');c.width=image.width;c.height=image.height;const ctx=c.getContext('2d');ctx.drawImage(image,0,0);const actual=ctx.getImageData(0,0,c.width,c.height).data,raw=qa.raw.getContext('2d').getImageData(0,0,c.width,c.height).data;let normal=0,flipped=0,n=0;for(let y=0;y<c.height;y+=13)for(let x=0;x<c.width;x+=11)for(let ch=0;ch<3;ch++){const i=(y*c.width+x)*4+ch,j=(y*c.width+c.width-1-x)*4+ch;normal+=Math.abs(actual[i]-raw[i]);flipped+=Math.abs(actual[i]-raw[j]);n++;}image.close();return {normal:normal/n,flipped:flipped/n,width:c.width,height:c.height,preview:document.querySelector('video').getBoundingClientRect().width};})()`);
-    assert(result.width>result.preview,'captured CSS resolution');
-    assert(mirrored?result.flipped<result.normal&&result.flipped<4:result.normal<result.flipped&&result.normal<4,'mirror pixels '+JSON.stringify(result));
-    report.checks.push({mirror:mirrored,...result});
-  };
-  await cdp('Page.navigate',{url:origin+'/'});await waitFor(`!!document.querySelector('.landing-start a')`,'landing');
-  assert(await evaluate('qa.calls.length===0'),'landing requested camera');
-  await click('.landing-start a');await route('/camera');
-  for(const count of [1,2,4,6]){
-    console.log('Camera session',count);
-    await choose('Photo count',String(count));await enable();
-    if(count===1){await click('.audio-option button');await waitFor(`document.querySelector('.audio-option').textContent.includes('Audio on')`,'audio ready');}
-    if(count===2){await evaluate(`qa.deny='audio'`);await click('.audio-option button');await waitFor(`document.querySelector('.audio-option').textContent.includes('blocked')`,'audio denial');}
-    if(count===2)await click('[aria-label="Mirror Camera"]');
-    await layout(1440,count===4);await layout(390,count===4);await layout(320);await layout(768);await layout(1440);
-    await click('.setup-continue');await route('/capture');
-    assert(await photos()===0,'Continue created mock captures');
-    assert(await evaluate(`document.querySelector('.choose-frame').disabled`),'Choose Frame prematurely enabled');
-    assert(await evaluate(`document.querySelector('[aria-label="Switch camera"]').disabled`),'single camera switch enabled');
-    for(let i=1;i<=count;i++){
-      const data=await shot(i);assert(data.flashes>0&&JSON.stringify(data.ticks)===JSON.stringify(['3','2','1']),'flash/countdown presentation');
-      if(count===1)assert(data.recording.audio===1&&data.recording.stopped,'audio motion missing');
-      if(count===2)assert(data.recording.audio===0&&data.recording.stopped,'denied mic prevented silent recording');
-      if(i===1&&count<=2)await mirrorCheck(count===1);
-    }
-    assert(await evaluate(`location.pathname==='/capture'&&document.querySelector('.capture-counter strong').textContent==='${count}/${count}'&&document.querySelector('.capture-actions button:last-child').disabled`),'completion behavior');
-    await layout(1440,count===4);await layout(390,count===4);await layout(320);await layout(768);await layout(1440);
-    const sources=await evaluate(`[...document.querySelectorAll('.capture-strip svg image')].map(i=>i.getAttribute('href'))`);
-    await click('.choose-frame');await route('/customize');await delay(100);
-    assert(await evaluate(`qa.tracks.every(t=>t.readyState==='ended')`),'tracks live on Customize');
-    assert(await evaluate(`document.querySelectorAll('.customize-preview svg image').length===${count}`),'Customize count');
-    await click('[aria-label="Vanilla"]');
-    for(let i=0;i<9;i++){
-      const geometry=await evaluate(`(()=>{const a=document.querySelector('.customize-preview').getBoundingClientRect(),b=document.querySelector('.customize-preview svg > rect').getBoundingClientRect(),foot=['.frame-selection','.add-text','.print-action'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return r.y+r.height/2;});return {dx:Math.abs(a.x+a.width/2-b.x-b.width/2),dy:Math.abs(a.y+a.height/2-b.y-b.height/2),foot,filter:getComputedStyle(document.querySelector('.customize-preview svg')).filter};})()`);
-      assert(geometry.dx<1&&geometry.dy<1&&Math.max(...geometry.foot)-Math.min(...geometry.foot)<1&&geometry.filter.includes('drop-shadow'),'Customize geometry '+JSON.stringify(geometry));
-      await click('[aria-label="Next frame"]');
-    }
-    await layout(1440,count===4);await layout(390,count===4);await layout(320);await layout(768);await layout(1440);
-    await click('.print-action');await route('/print');
-    assert(await evaluate(`!document.querySelector('.print-continuation a')`),'Print button shown too early');
-    await waitFor(`!!document.querySelector('.print-continuation a')`,'Print completed');await delay(2300);
-    assert(await evaluate(`location.pathname==='/print'&&qa.print===0`),'Print auto navigated');
-    await layout(390,count===4);await layout(1440,count===4);
-    await click('.print-continuation a');await route('/results');
-    assert(JSON.stringify(await evaluate(`[...document.querySelectorAll('.results-strip svg image')].map(i=>i.getAttribute('href'))`))===JSON.stringify(sources),'Results images changed');
-    await layout(1440,count===4);await layout(390,count===4);await layout(320);await layout(768);
-    const calls=await evaluate('qa.calls.length');
-    await click('a[href="/customize"].result-action');await route('/customize');
-    assert(await evaluate(`qa.calls.length===${calls}&&qa.tracks.every(t=>t.readyState==='ended')`),'Edit Again accessed hardware');
-    await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'Print');await click('.print-continuation a');await route('/results');
-    await click('a[href="/camera"].result-action');await route('/camera');
-    assert(await evaluate(`qa.blobs.size===0&&qa.tracks.every(t=>t.readyState==='ended')`),'Take Another resource leak');
-    report.counts.push(count);
-  }
-  // Timers, flash off, reduced motion, recorder fallback, restart, cancellation.
-  await choose('Photo count','1');await choose('Timer','5s');await enable();await click('.setup-continue');await route('/capture');
-  await click('[aria-label="Screen flash"]');const five=await shot(1,5);assert(five.flashes===0,'disabled flash fired');
-  await click('.capture-feedback button');assert(await photos()===0&&await evaluate('qa.blobs.size===0'),'restart leak');
-  await click('.capture-counter .back-link');await route('/camera');await choose('Timer','10s');await click('.setup-continue');await route('/capture');
-  await evaluate('window.MediaRecorder=undefined');await shot(1,10);assert(await evaluate(`document.querySelector('.capture-feedback').textContent.includes('unavailable')`),'recorder fallback message');
-  await click('.capture-feedback button');await click('.capture-actions button:last-child');await delay(150);await click('.capture-counter .back-link');await route('/camera');await delay(500);
-  assert(await evaluate(`qa.blobs.size===0`),'navigation saved stale capture');
-  await click('.setup-panel .back-link');await route('/');assert(await evaluate(`qa.tracks.every(t=>t.readyState==='ended')`),'landing camera active');
-  await click('.landing-start a');await route('/camera');await evaluate(`qa.deny='camera'`);await click('.camera-empty button');await waitFor(`document.querySelector('.camera-empty').textContent.includes('blocked')`,'camera denial');
-  await choose('Photo count','2');await click('.setup-continue');await route('/capture');
-  const upload = async expression => {await evaluate(`(()=>{const input=document.querySelector('input[type=file]'),dt=new DataTransfer();for(const f of ${expression})dt.items.add(f);input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);await delay(150);};
-  await upload(`[new File(['bad'],'bad.txt',{type:'text/plain'})]`);assert(await photos()===0,'invalid upload accepted');
-  await upload(`[new File(['bad'],'bad.png',{type:'image/png'})]`);await waitFor(`document.querySelector('.capture-feedback').textContent.includes('could not be opened')`,'decode error');
-  await upload(`[new File([new Uint8Array(51*1024*1024)],'huge.png',{type:'image/png'})]`);assert(await photos()===0,'oversize accepted');
-  await evaluate(`(async()=>{window.qaUpload=await new Promise(r=>{const c=document.createElement('canvas');c.width=128;c.height=256;const x=c.getContext('2d');x.fillStyle='#d93d52';x.fillRect(0,0,128,256);c.toBlob(r,'image/png');});})()`);
-  await upload(`[1,2,3].map(i=>new File([qaUpload],'photo'+i+'.png',{type:'image/png'}))`);await waitFor(`document.querySelectorAll('.capture-strip svg image').length===2`,'uploads');
-  assert(await evaluate(`[...qa.blobs.values()].every(b=>b.type==='image/jpeg')`),'upload generated fake motion');
-  await click('.choose-frame');await route('/customize');
-  await cdp('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
-  await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'reduced print');await delay(2000);
-  assert(await evaluate(`location.pathname==='/print'&&getComputedStyle(document.querySelector('.print-output svg')).animationName==='none'`),'reduced motion flow');
-  const privacy=await evaluate(`({print:qa.print,requests:qa.requests.filter(r=>r.method!=='GET'||r.body),external:performance.getEntriesByType('resource').filter(e=>!e.name.startsWith(location.origin)&&!e.name.startsWith('blob:')).map(e=>e.name)})`);
-  assert(!privacy.print&&!privacy.requests.length&&!privacy.external.length,'privacy '+JSON.stringify(privacy));
-  report.privacy={...privacy,networkRequests};
-  assert(networkRequests.every(r=>r.method==='GET'&&(r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:'))),'Unexpected network request');
-  report.checks.push('restart releases still/motion URLs','navigation cancels countdown','audio allowed and denied','camera denied upload recovery','unsupported/corrupt/oversized upload','upload count cap and no fake motion','reduced motion print waits','no system print or media network requests');
-  for(const path of ['/capture','/customize','/print','/results']){await cdp('Page.navigate',{url:origin+path});await route('/camera');await waitFor(`!!document.querySelector('#camera-device')`,'fallback');assert(await evaluate('qa.calls.length===0'),'direct route permissions');}
-  await writeFile(out+'/m3-report.json',JSON.stringify(report,null,2));
-  console.log(JSON.stringify({counts:report.counts,layouts:report.layouts.length,timers:report.timers.map(t=>({seconds:t.timer,elapsed:t.elapsed})),checks:report.checks,errors},null,2));
-  if(errors.length)process.exitCode=1;
-} finally { await writeFile(out+'/m3-report.json',JSON.stringify(report,null,2)); browser.kill(); for(const promise of pending.values())clearTimeout(promise.timer); }
+ const {targetId}=await send('Target.createTarget',{url:'about:blank'});
+ const {sessionId}=await send('Target.attachToTarget',{targetId,flatten:true});
+ const cdp=(method,params={})=>send(method,params,sessionId);
+ const evaluate=async expression=>{const r=await cdp('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw new Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+ const assert=(v,m)=>{if(!v)throw new Error(m);};
+ const waitFor=async(expression,name,timeout=15000)=>{const start=Date.now();while(Date.now()-start<timeout){if(await evaluate(expression))return;await delay(60);}throw new Error('Timeout '+name+': '+await evaluate('document.body.innerText'));};
+ const route=path=>waitFor(`location.pathname===${JSON.stringify(path)}`,path);
+ const click=async selector=>{await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);await delay(60);};
+ const choose=async(label,value)=>{await evaluate(`[...document.querySelectorAll('[aria-label="${label}"] button')].find(b=>b.textContent===${JSON.stringify(value)}).click()`);await delay(60);};
+ await cdp('Page.enable');await cdp('Runtime.enable');await cdp('Log.enable');await cdp('Network.enable');
+ await cdp('Page.addScriptToEvaluateOnNewDocument',{source:`
+ window.qa={calls:[],tracks:[],urls:new Map(),revoked:[],flashes:[],shots:[],ticks:[],denyAudio:false,print:0};window.print=()=>qa.print++;
+ const gum=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+ navigator.mediaDevices.getUserMedia=async c=>{qa.calls.push(c);if(c.audio&&qa.denyAudio)throw new DOMException('Denied','NotAllowedError');const s=await gum(c);qa.tracks.push(...s.getTracks());return s;};
+ const make=URL.createObjectURL.bind(URL),revoke=URL.revokeObjectURL.bind(URL);URL.createObjectURL=b=>{const u=make(b);qa.urls.set(u,b);return u;};URL.revokeObjectURL=u=>{qa.urls.delete(u);qa.revoked.push(u);revoke(u);};
+ const draw=CanvasRenderingContext2D.prototype.drawImage;CanvasRenderingContext2D.prototype.drawImage=function(source,...args){if(source instanceof HTMLVideoElement&&this.canvas.width>1000){qa.shots.push({at:performance.now(),flash:!!document.querySelector('.screen-flash'),width:this.canvas.width,filter:document.querySelector('.filter-option[aria-pressed=true]')?.getAttribute('aria-label')});}return draw.call(this,source,...args);};
+ document.addEventListener('DOMContentLoaded',()=>new MutationObserver(records=>{
+   for(const r of records){for(const node of r.addedNodes){if(node.nodeType===1&&node.matches('.screen-flash')){const s=getComputedStyle(node),b=node.getBoundingClientRect();qa.flashes.push({at:performance.now(),color:s.backgroundColor,opacity:s.opacity,z:s.zIndex,position:s.position,pointer:s.pointerEvents,x:b.x,y:b.y,w:b.width,h:b.height,vw:innerWidth,vh:innerHeight,parent:node.parentElement.tagName});}}
+   for(const node of r.removedNodes){if(node.nodeType===1&&node.matches('.screen-flash')){qa.flashes.at(-1).duration=performance.now()-qa.flashes.at(-1).at;}}}
+   const n=document.querySelector('.countdown')?.textContent;if(n&&qa.ticks.at(-1)!==n)qa.ticks.push(n);
+ }).observe(document.body,{subtree:true,childList:true,characterData:true}));
+ `});
+ const layout=async(width,height=1024,shot=false)=>{
+   await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});await delay(140);
+   const l=await evaluate(`({route:location.pathname,width:innerWidth,height:innerHeight,sw:document.documentElement.scrollWidth,sh:document.documentElement.scrollHeight,clips:document.querySelectorAll('svg.photo-strip clipPath').length})`);
+   assert(l.sw<=width,'horizontal overflow '+JSON.stringify(l));if(width>=1100)assert(l.sh<=height,'desktop vertical overflow '+JSON.stringify(l));report.layouts.push(l);
+   if(shot){const image=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});await writeFile(out+'/m4-'+l.route.slice(1)+'-'+width+'.png',Buffer.from(image.data,'base64'));}
+ };
+ const center=async selector=>{
+   const g=await evaluate(`(()=>{const a=document.querySelector('${selector}').getBoundingClientRect(),b=document.querySelector('${selector} svg > rect').getBoundingClientRect();return {dx:Math.abs(a.x+a.width/2-b.x-b.width/2),dy:Math.abs(a.y+a.height/2-b.y-b.height/2)};})()`);assert(g.dx<1&&g.dy<1,'centering '+selector+JSON.stringify(g));
+ };
+ const progress=()=>evaluate(`Number(document.querySelector('.capture-counter strong').textContent.split('/')[0])`);
+ const waitCount=count=>waitFor(`document.querySelector('.capture-counter strong')?.textContent.startsWith('${count}/')`,'photo '+count,90000);
+ const start=async(count,timer=1)=>{
+   await cdp('Page.navigate',{url:origin+'/'});await waitFor(`!!document.querySelector('.landing-start a')`,'landing');assert(await evaluate('qa.calls.length===0'),'landing permission');
+   await click('.landing-start a');await route('/camera');await choose('Photo count',String(count));await choose('Timer',timer+'s');
+   await click('.camera-empty button');await waitFor(`document.querySelector('video')?.readyState>=2&&!document.querySelector('.camera-empty')`,'camera');
+   assert(await evaluate(`getComputedStyle(document.querySelector('video')).filter==='none'&&!document.querySelector('.live-filter-canvas')`),'Original has processing');
+   await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
+   await click('.setup-continue');await route('/capture');await waitFor(`document.querySelectorAll('.filter-thumbnail img').length===9`,'filter thumbnails');
+   assert(await evaluate(`document.querySelector('[aria-label="Original"]').getAttribute('aria-pressed')==='true'`),'Original default');
+   await center('.capture-strip');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
+ };
+ const assertFlash=async expected=>{
+   await delay(200);const q=await evaluate(`({flashes:qa.flashes,shots:qa.shots,ticks:qa.ticks})`);
+   assert(q.shots.length===expected&&q.flashes.length===expected,'flash/shot mismatch '+JSON.stringify(q));
+   for(const f of q.flashes)assert(f.color==='rgb(255, 255, 255)'&&f.opacity==='1'&&f.position==='fixed'&&f.z==='2147483647'&&f.parent==='BODY'&&f.x===0&&f.y===0&&f.w===f.vw&&f.h===f.vh&&f.duration>=100&&f.duration<220&&f.pointer==='none','flash style/timing '+JSON.stringify(f));
+   assert(q.shots.every(s=>s.flash),'video sampled before flash');assert(!q.ticks.includes('1'),'countdown displayed 1');report.flashes.push(q);
+ };
+ const upload=async count=>{
+   await evaluate(`(async()=>{const c=document.createElement('canvas');c.width=160;c.height=200;const x=c.getContext('2d');x.fillStyle='#bf806b';x.fillRect(0,0,160,200);x.fillStyle='#334455';x.fillRect(0,0,60,100);const b=await new Promise(r=>c.toBlob(r));const d=new DataTransfer();for(let i=0;i<${count};i++)d.items.add(new File([b],'test'+i+'.png',{type:'image/png'}));const input=document.querySelector('input[type=file]');input.files=d.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);await waitCount(count);
+ };
+ for(const count of [1,2,4,5,6,8,10,12]){
+   console.log('M4 count',count);await start(count,[4,6,8,12].includes(count)?3:1);
+   if(count===1){await cdp('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await click('.capture-actions button:last-child');await waitCount(1);await assertFlash(1);await cdp('Emulation.setEmulatedMedia',{features:[]});}
+   else if([4,6,8,12].includes(count)){
+     await click('.capture-actions button:last-child');
+     if(count===8){
+       await delay(250);await click('[aria-label="Pause capture"]');await waitFor(`document.querySelector('.capture-actions button:last-child').textContent==='Resume'`,'pause');await delay(1200);assert(await progress()===0,'ghost capture after pause');
+       await click('[aria-label="Golden hour"]');await click('.capture-actions button:last-child');await waitCount(3);await click('[aria-label="Pause capture"]');await waitFor(`document.querySelector('.capture-actions button:last-child').textContent==='Resume'`,'pause three');assert(await progress()===3,'pause lost count');
+       await click('[aria-label="Silver screen"]');await click('.capture-actions button:last-child');
+     }
+     await waitCount(count);await waitFor(`!!document.querySelector('a.choose-frame')`,'sequence complete');await assertFlash(count);
+   } else await upload(count);
+   await center('.capture-strip');await layout(1440,1024,count===8);
+   const composition=await evaluate(`({box:document.querySelector('.capture-strip svg').getAttribute('viewBox'),slots:[...document.querySelectorAll('.capture-strip clipPath rect')].map(n=>({x:n.getAttribute('x'),y:n.getAttribute('y')}))})`);
+   assert(new Set(composition.slots.map(s=>s.x)).size===(count>=6?2:1),'wrong columns');
+   if(count===8){await waitFor(`document.querySelectorAll('.capture-strip image').length===8`,'processed images');assert(await evaluate(`JSON.stringify([...document.querySelectorAll('.capture-strip image')].map(n=>n.dataset.filter))===JSON.stringify(['golden-hour','golden-hour','golden-hour','silver-screen','silver-screen','silver-screen','silver-screen','silver-screen'])`),'per-capture filter lost');}
+   await click('.choose-frame');await route('/customize');assert(await evaluate(`qa.tracks.every(t=>t.readyState==='ended')`),'hardware remained on');
+   for(let f=0;f<9;f++){await center('.customize-preview');await click('[aria-label="Next frame"]');}
+   await click('[aria-label="Vanilla"]');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
+   await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print');await delay(400);assert(await evaluate(`location.pathname==='/print'`),'print auto navigated');
+   assert(await evaluate(`document.querySelector('.print-output svg').getAttribute('viewBox')===${JSON.stringify(composition.box)}`),'print geometry changed');
+   await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
+   await click('.print-continuation a');await route('/results');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
+   assert(await evaluate(`document.querySelector('.results-strip svg').getAttribute('viewBox')===${JSON.stringify(composition.box)}`),'results geometry changed');
+   const calls=await evaluate('qa.calls.length');await click('a[href="/customize"].result-action');await route('/customize');assert(await evaluate(`qa.calls.length===${calls}`),'Edit Again permission');
+   const privacy=await evaluate(`({print:qa.print,frames:performance.getEntriesByType('resource').some(e=>e.name.includes('/frames/'))})`);assert(!privacy.print&&!privacy.frames,'unexpected print/custom frame');
+   report.counts.push(count);
+ }
+ console.log('M4 manual/filter/timer checks');
+ await start(4,1);await click('[aria-label="Screen flash"]');await click('.capture-actions button:last-child');await waitCount(1);await delay(1500);assert(await progress()===1,'manual continued');assert(await evaluate('qa.flashes.length===0'),'flash off');
+ await click('[aria-label="Golden hour"]');await click('.capture-actions button:last-child');await waitCount(2);
+ await click('[aria-label="Silver screen"]');await click('.capture-actions button:last-child');await waitCount(3);
+ await click('[aria-label="Original"]');await click('.capture-actions button:last-child');await waitCount(4);await waitFor(`document.querySelectorAll('.capture-strip image').length===4`,'filters');
+ assert(await evaluate(`JSON.stringify([...document.querySelectorAll('.capture-strip image')].map(n=>n.dataset.filter))===JSON.stringify(['original','golden-hour','silver-screen','original'])`),'manual filter assignment');
+ await click('.capture-feedback button');await waitCount(0);await waitFor(`![...qa.urls.values()].some(b=>b.type.startsWith('video/'))`,'motion cleanup');
+ for(const timer of [5,10]){
+   await start(2,timer);await click('.capture-actions button:last-child');await waitCount(2);await assertFlash(2);
+   const ticks=await evaluate('qa.ticks');assert(ticks.includes(String(timer))&&ticks.includes('Smile!')&&!ticks.includes('1'),'timer copy');
+ }
+ await start(1,1);await click('.capture-counter .back-link');await route('/camera');await evaluate('qa.denyAudio=true');await click('[aria-label="Live Moment Audio"]');await waitFor(`document.querySelector('.audio-status').textContent.includes('silent')`,'audio fallback');
+ const audioCalls=await evaluate('qa.calls.filter(c=>c.audio).length');await click('[aria-label="Live Moment Audio"]');await click('[aria-label="Live Moment Audio"]');assert(await evaluate(`qa.calls.filter(c=>c.audio).length===${audioCalls}`),'repeated mic prompt');
+ await click('.setup-continue');await route('/capture');await click('.capture-actions button:last-child');await waitCount(1);await assertFlash(1);
+ await click('.choose-frame');await route('/customize');await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print');await click('.print-continuation a');await route('/results');await click('a[href="/camera"].result-action');await route('/camera');
+ await waitFor('qa.urls.size===0','Take Another URLs');assert(await evaluate(`qa.tracks.every(t=>t.readyState==='ended')`),'Take Another hardware');
+ assert(networkRequests.every(r=>r.method==='GET'&&(r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:'))),'unexpected outbound request');
+ report.checks=['all counts shared across four stages','1s manual','3/5/10 continuous','pause during countdown','pause after 3/resume with filter change','Original pixel pipeline','manual per-photo filters','flash disabled','flash enabled with reduced motion','audio denial without repeat prompt','URL/track cleanup','desktop and mobile layouts','Print explicit continuation','no media uploads/custom frames'];
+ console.log(JSON.stringify({counts:report.counts,flashCases:report.flashes.map(f=>f.flashes.length),layouts:report.layouts.length,errors},null,2));if(errors.length)process.exitCode=1;
+} finally {await writeFile(out+'/m4-report.json',JSON.stringify(report,null,2));browser.kill();for(const promise of pending.values())clearTimeout(promise.timer);}

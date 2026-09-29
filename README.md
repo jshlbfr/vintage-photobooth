@@ -1,9 +1,9 @@
 # Vintage Photobooth
 
-Milestone 3: real browser camera capture, optional microphone audio, short motion
-clips and local image uploads now feed the shared in-memory session. Supplied
-Figma artwork and nine generated frame styles remain in place.
-See [the milestone report](docs/milestone-3.md).
+Milestone 4 adds manual/continuous capture with Pause/Resume, full-viewport
+photographic flash, eight photo counts and a non-destructive Canvas filter engine.
+Camera photos, optional audio and motion remain local in the browser.
+See [the milestone report](docs/milestone-4.md).
 Reference screenshots are never rendered as the interface.
 
 ## Local development
@@ -26,11 +26,13 @@ binding, use `npm run dev -- --webpack`.
 | `/print` | Short strip-feed animation; waits for See Your Photos |
 | `/results` | Actual captured strip and action hierarchy |
 
-START creates a fresh session. Choose **1 / 2 / 4 / 6 photos only in Camera
-Setup**, enable your camera, then Continue. Capture takes one photo per click;
+START creates a fresh session. Choose **1 / 2 / 4 / 5 / 6 / 8 / 10 / 12 photos only in Camera
+Setup**, enable your camera, then Continue. Timer 1s takes one photo per click;
+3s/5s/10s run a continuous sequence with Pause/Resume. The last second says Smile!.
+Counts 6 and above use a wider two-column strip.
 Upload fills available slots from local images. Continue never creates photos.
 Device, mirror,
-timer, flash, filter, frame and color selections persist through client-side
+timer, flash, current filter, frame and color selections persist through client-side
 navigation. Capture, Customize, Print and Results render the same composition.
 Edit Again preserves everything; Take Another resets to defaults at Camera.
 
@@ -63,6 +65,8 @@ motion skips the animation; both modes require clicking See Your Photos.
   through Landing also preserves state until START is pressed.
 - `lib/session/`: types, defaults, action union, pure reducer and selectors.
   Captures store lightweight references into a browser-owned Blob/URL store.
+- `lib/filters/` and `components/filters/`: typed photographic presets, shared
+  pixel processing, scaled live preview and reference-counted derived previews.
 - `lib/media/`: camera controller, Blob ownership, accurate cancellable countdown,
   source-resolution Canvas still/upload processing and short MediaRecorder clips.
 - `components/media/`: route/session cleanup provider, video preview and capture hook.
@@ -73,7 +77,8 @@ motion skips the animation; both modes require clicking See Your Photos.
 - `lib/composition.ts`: shared presentation model and crop
   math for a later rendering pipeline. No DOM screenshot export.
 - `lib/design-data.ts`: frame colors/styles and eight original preview looks.
-  CSS treatments are placeholders for later production filter processing.
+  Presets use the shared Canvas engine in `lib/filters/`. Original is the
+  default and bypasses grading. Each capture retains its own filter ID.
 - `components/artwork/` and `lib/artwork.ts`: supplied decorative assets and
   actual stickers with responsive Next.js image handling.
 - `public/images/README.md`: sample photograph sources and licensing reference.
@@ -97,10 +102,14 @@ building requires access to Google Fonts. No application dependencies were added
 
 Tests use native TypeScript stripping and a local import-resolution hook,
 validated on Node 24. No test runner package was added. The earlier milestone
-reports remain historical references; `docs/milestone-3.md` records current
+reports remain historical references; `docs/milestone-4.md` records current
 behavior and validation.
 
 Optional camera integration checks use an existing Chromium executable with
 synthetic devices: `CHROMIUM_PATH=/path/to/chrome-headless-shell node tests/browser-media.mjs`.
 Start the production server on port 3003 first. See the milestone report for
 coverage and physical-device limitations.
+
+Flash is an opaque white overlay over the entire viewport for 150 ms per shutter.
+It remains enabled with reduced motion when the user selects Flash. The source
+still always comes from the camera video, independent of the overlay.

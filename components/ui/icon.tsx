@@ -8,7 +8,7 @@ const paths: Record<IconName, React.ReactNode> = {
   "chevron-left": <path d="m14 7-5 5 5 5" />,
   "chevron-right": <path d="m10 7 5 5-5 5" />,
   camera: <><path d="M8 5 6 8H3v12h18V8h-3l-2-3Z" /><circle cx="12" cy="13" r="3.5" /></>,
-  "switch-camera": <><path d="M8 5 6 8H3v12h18V8h-3l-2-3Z" /><path d="M8 13a4 4 0 0 1 7-2m0-3v3h-3m4 4a4 4 0 0 1-7 2m0 3v-3h3" /></>,
+  "switch-camera": <><path d="M3 8V4m0 4h4M21 16v4m0-4h-4M4 7a9 9 0 0 1 15-2M20 17a9 9 0 0 1-15 2" /><rect x="7" y="8" width="10" height="8" rx="2" /><circle cx="12" cy="12" r="2" /></>,
   download: <><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5" /></>,
   play: <><circle cx="12" cy="12" r="10" /><path d="m10 7 7 5-7 5Z" /></>,
   qr: <><path d="M3 3h7v7H3Zm11 0h7v7h-7ZM3 14h7v7H3Zm12 0h3v3h3v4h-7v-4m7-3v1M6 6h1m10 0h1M6 17h1" /></>,

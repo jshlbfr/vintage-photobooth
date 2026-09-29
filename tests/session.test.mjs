@@ -15,7 +15,7 @@ const fill = session => {
   return session;
 };
 
-for (const count of [1, 2, 4, 6]) {
+for (const count of [1, 2, 4, 5, 6, 8, 10, 12]) {
   test(`${count} photos: setup is the sole count source through the entire composition`, () => {
     let session = reduce(fresh(), { type: "camera/count", count });
     assert.equal(session.captures.length, 0);
@@ -49,7 +49,7 @@ test("preferences, filter, geometry and all colors survive unrelated changes", (
     for (const color of FRAME_COLORS) {
       session = reduce(session, { type: "customization/color", color: color.value });
       const composition = selectStripComposition(session);
-      assert.equal(composition.filter, filter.css);
+      assert.equal(session.customization.filterId, filter.id);
       assert.equal(composition.frameColor, color.value);
       assert.equal(composition.frameStyle, "wide");
       assert.equal(session.captures, captures);
@@ -136,4 +136,16 @@ test("composition resolves shared local references without duplicating images", 
   const composition = selectStripComposition(session, ref => `blob:local/${ref.resourceId}`);
   assert.equal(composition.photos[0].src, "blob:local/photo-0");
   assert.equal(selectStripComposition(session).photos[0].src, undefined);
+});
+
+
+test("Original starts every session and per-photo filters survive later selection changes", () => {
+  let session = reduce(fresh(), { type: "captures/begin" });
+  assert.equal(session.customization.filterId, "original");
+  for (const [index, filter] of ["original", "golden-hour", "silver-screen"].entries()) {
+    session = reduce(session, { type: "customization/filter", filterId: filter });
+    session = reduce(session, { type: "captures/add", sessionId: session.id, capture: {...capture(`filter-${index}`),filterAtCapture:filter} });
+  }
+  session = reduce(session, { type: "customization/filter", filterId: "original" });
+  assert.deepEqual(selectStripComposition(session).photos.map(photo => photo.filterId), ["original", "golden-hour", "silver-screen"]);
 });

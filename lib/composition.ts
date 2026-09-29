@@ -1,13 +1,12 @@
-import type { PhotoCount, StickerKind } from "./design-data";
+import type { PhotoCount, StickerKind, FilterId } from "./design-data";
 import { getFrameTemplate, resolveFrameLayout } from "./frame-templates";
 
 /** Presentation geometry, shared by every strip. No media or session lifecycle here. */
 export type StripComposition = {
   count: PhotoCount;
-  photos: readonly { src?: string; alt: string; fit?: "cover" | "contain" }[];
+  photos: readonly { src?: string; alt: string; fit?: "cover" | "contain"; filterId?: FilterId }[];
   frameColor: string;
   frameStyle: string;
-  filter: string;
   caption?: string;
   texts?: readonly {
     id: string; content: string; x: number; y: number; size: number; rotation: number;

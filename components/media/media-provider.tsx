@@ -41,6 +41,9 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     return () => navigator.mediaDevices?.removeEventListener?.("devicechange", refresh);
   }, [cameraRoute, media]);
   useEffect(() => {
+    if (cameraRoute && session?.preferences.audioEnabled && state.status === "ready" && state.audio === "off") void media.camera.enableAudio();
+  }, [cameraRoute, session?.preferences.audioEnabled, state.status, state.audio, media]);
+  useEffect(() => {
     if (state.status === "ready" && session && state.deviceId !== session.preferences.deviceId) dispatch({ type: "camera/device", deviceId: state.deviceId });
   }, [state.status, state.deviceId, session, dispatch]);
   useEffect(() => {

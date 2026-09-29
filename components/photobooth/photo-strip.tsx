@@ -1,3 +1,4 @@
+import { FilteredPhoto } from "@/components/filters/filtered-image";
 import { useId } from "react";
 import { StripSticker } from "@/components/artwork/sticker";
 import { getStripLayout, type StripComposition } from "@/lib/composition";
@@ -10,15 +11,14 @@ export function PhotoStrip({ composition, empty = false, className = "", label =
   const template = getFrameTemplate(composition.frameStyle);
   const artwork = template.kind === "asset" ? template.variants[composition.count] : undefined;
   const frameImage = artwork && <image href={artwork.asset} width={layout.width} height={layout.height} />;
-  return <svg className={`photo-strip strip-preview ${className}`} viewBox={`0 0 ${layout.width} ${layout.height}`} role="img" aria-label={`${label}, ${composition.count} photos`}>
+  return <svg className={`photo-strip strip-preview ${className}`} data-columns={new Set(layout.slots.map(slot => slot.x)).size} viewBox={`0 0 ${layout.width} ${layout.height}`} role="img" aria-label={`${label}, ${composition.count} photos`}>
     <rect width={layout.width} height={layout.height} rx={layout.radius} fill={composition.frameColor} />
     {artwork?.layer === "background" && frameImage}
     {layout.slots.map((slot, index) => <g key={index}>
       <defs><clipPath id={`${id}-slot-${index}`}><rect {...slot} rx={slot.radius} /></clipPath></defs>
       <rect {...slot} rx={slot.radius} fill={empty || !composition.photos[index]?.src ? "#e7ddc8" : "#050403"} />
       {!empty && composition.photos[index]?.src && <g clipPath={`url(#${id}-slot-${index})`}>
-        <image href={composition.photos[index].src} {...slot} preserveAspectRatio={composition.photos[index].fit === "contain" ? "xMidYMid meet" : "xMidYMid slice"} style={{ filter: composition.filter }} />
-        <rect {...slot} fill="#4a2c12" opacity=".08" />
+        <FilteredPhoto src={composition.photos[index].src} filterId={composition.photos[index].filterId ?? "original"} {...slot} preserveAspectRatio={composition.photos[index].fit === "contain" ? "xMidYMid meet" : "xMidYMid slice"} />
       </g>}
     </g>)}
     {artwork?.layer === "overlay" && frameImage}
