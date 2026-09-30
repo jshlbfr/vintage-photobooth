@@ -6,6 +6,7 @@ import { ActionLink, BackLink, Button, Switch } from "@/components/ui/controls";
 import { Panel } from "@/components/ui/panel";
 import { Icon } from "@/components/ui/icon";
 import { PhotoStrip } from "@/components/photobooth/photo-strip";
+import { useThumbnailSource } from "@/components/filters/use-thumbnail-source";
 import { FilterPicker } from "@/components/photobooth/filter-picker";
 import { CameraPreview } from "@/components/media/camera-preview";
 import { useMedia, useStripComposition } from "@/components/media/media-provider";
@@ -22,6 +23,7 @@ export function CaptureScreen() {
   const { session, dispatch } = usePhotoBoothSession();
   const { camera, state } = useMedia();
   const video = useRef<HTMLVideoElement>(null);
+  const thumbnailSource=useThumbnailSource(video,session.preferences.mirrored,state.deviceId);
   const input = useRef<HTMLInputElement>(null);
   const capture = useCapture(video);
   const composition = useStripComposition();
@@ -39,7 +41,7 @@ export function CaptureScreen() {
       <div className="capture-actions"><Button disabled={capture.busy || capture.complete} onClick={() => input.current?.click()}>Upload</Button>{capture.busy && capture.continuous && capture.phase !== "uploading" ? <Button onClick={capture.pause} aria-label="Pause capture">Pause</Button> : <Button disabled={capture.busy || capture.complete || state.status !== "ready"} onClick={() => void capture.capture()}>{capture.busy ? "Please wait…" : capture.phase === "paused" ? "Resume" : "Capture"}</Button>}</div>
       <input ref={input} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif" multiple tabIndex={-1} aria-label="Upload photos" onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); void capture.upload(files); event.currentTarget.value = ""; }} />
       <div className="capture-feedback"><p role="status">{capture.message || (capture.complete ? "All photos are ready. Choose your frame." : "Photos and motion stay on this device.")}</p>{(session.captures.length > 0 || capture.busy) && <button className="text-link" type="button" onClick={capture.restart}>Restart</button>}</div>
-      <FilterPicker value={session.customization.filterId} onChange={(filterId) => dispatch({ type: "customization/filter", filterId })} disabled={capture.busy} />
+      <FilterPicker source={thumbnailSource} value={session.customization.filterId} onChange={(filterId) => dispatch({ type: "customization/filter", filterId })} disabled={capture.busy} />
     </div>
     <div className="capture-strip"><PhotoStrip composition={composition} label="Your captured photostrip" /></div>
     <ol className="capture-instructions">{instructions.map((step, index) => <li key={step.title}><h2><span className="instruction-badge"><b>{index + 1}</b></span>{step.title}</h2><p>{step.description}</p></li>)}</ol>

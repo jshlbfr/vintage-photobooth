@@ -8,7 +8,7 @@ const { hasCompleteCaptures, selectStripComposition } = await import("../lib/ses
 const { FRAME_STYLES } = await import("../lib/frame-templates.ts");
 const { FRAME_COLORS, FILTER_PREVIEWS } = await import("../lib/design-data.ts");
 const fresh = () => createSession("session-a", 1000);
-const capture = id => ({ id, source: "camera", still: { kind: "local", resourceId: id, mimeType: "image/jpeg", width: 1920, height: 1080 }, capturedAt: 2000, filterAtCapture: "old-soul" });
+const capture = id => ({ id, source: "camera", still: { kind: "local", resourceId: id, mimeType: "image/jpeg", width: 1920, height: 1080 }, capturedAt: 2000, filterAtCapture: "chrome" });
 const fill = session => {
   session = reduce(session, { type: "captures/begin" });
   for (let i = session.captures.length; i < session.preferences.photoCount; i++) session = reduce(session, { type: "captures/add", sessionId: session.id, capture: capture(`photo-${i}`) });
@@ -88,7 +88,7 @@ test("a fresh session clears customization, media references, rewards and output
 test("every composition edit invalidates previously generated outputs", () => {
   const output = { resourceId: "test", mimeType: "image/png", createdAt: 2000 };
   for (const action of [
-    { type: "customization/filter", filterId: "sunday" },
+    { type: "customization/filter", filterId: "emerald" },
     { type: "customization/frame", frameId: "tight" },
     { type: "customization/color", color: "#702C2B" },
     { type: "customization/stickers", stickers: [] },
@@ -142,10 +142,10 @@ test("composition resolves shared local references without duplicating images", 
 test("Original starts every session and per-photo filters survive later selection changes", () => {
   let session = reduce(fresh(), { type: "captures/begin" });
   assert.equal(session.customization.filterId, "original");
-  for (const [index, filter] of ["original", "golden-hour", "silver-screen"].entries()) {
+  for (const [index, filter] of ["original", "golden-hour", "mono"].entries()) {
     session = reduce(session, { type: "customization/filter", filterId: filter });
     session = reduce(session, { type: "captures/add", sessionId: session.id, capture: {...capture(`filter-${index}`),filterAtCapture:filter} });
   }
   session = reduce(session, { type: "customization/filter", filterId: "original" });
-  assert.deepEqual(selectStripComposition(session).photos.map(photo => photo.filterId), ["original", "golden-hour", "silver-screen"]);
+  assert.deepEqual(selectStripComposition(session).photos.map(photo => photo.filterId), ["original", "golden-hour", "mono"]);
 });

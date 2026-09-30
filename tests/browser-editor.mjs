@@ -101,7 +101,7 @@ try {
    await click('.camera-empty button');await waitFor(`document.querySelector('video')?.readyState>=2&&!document.querySelector('.camera-empty')`,'camera');
    assert(await evaluate(`getComputedStyle(document.querySelector('video')).filter==='none'&&!document.querySelector('.live-filter-canvas')`),'Original has processing');
    await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
-   await click('.setup-continue');await route('/capture');await waitFor(`document.querySelectorAll('.filter-thumbnail img').length===9`,'filter thumbnails');
+   await click('.setup-continue');await route('/capture');await waitFor(`document.querySelectorAll('.filter-thumbnail img').length===10`,'filter thumbnails');
    assert(await evaluate(`document.querySelector('[aria-label="Original"]').getAttribute('aria-pressed')==='true'`),'Original default');
    await center('.capture-strip');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
  };
@@ -129,7 +129,7 @@ try {
  await cdp('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:out+'/downloads'});
  for(const count of (process.env.EDITOR_COUNTS?.split(',').map(Number)??[1,2,4,5,6,8,10,12])){
    console.log('M5 editor/export',count);await start(count,1);
-   if(count===2)await click('[aria-label="Silver screen"]');
+   if(count===2)await click('[aria-label="Mono"]');
    if(count===2){await upload(1);await click('[aria-label="Original"]');await upload(1,2);}else await upload(count);await click('.choose-frame');await route('/customize');await evaluate('document.fonts.ready');
    await click('[aria-label="Add heart sticker"]');await click('[aria-label="Add heart sticker"]');await click('[aria-label="Add camera sticker"]');
    const initial=await decorations();assert(initial.length===3&&new Set(initial.map(e=>e.id)).size===3,'independent stickers');assert(new Set(initial.map(e=>e.transform)).size===3,'stacked additions');

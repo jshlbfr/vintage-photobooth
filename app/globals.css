@@ -566,3 +566,17 @@ a.result-action:hover { background: #eadcc0; }
   .customize-tools .sticker-palette button { width: 48px; height: 48px; }
   .editor-history button, .editor-inspector button, .editor-inspector select { min-height: 36px; }
 }
+
+/* Local result media sits in a compact native modal; the Results layout stays intact. */
+.results-media-dialog { position: fixed; inset: 0; margin: auto; padding: 0; width: min(480px,calc(100vw - 32px)); max-height: calc(100svh - 40px); border: 1px solid var(--line); border-radius: 18px; background: var(--cream); color: var(--ink); box-shadow: 0 15px 60px #0007; overflow-y: auto; }
+.results-media-dialog::backdrop { background: #1d1812bb; }
+.media-dialog-content { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.media-dialog-content header, .moment-selector { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.media-dialog-content h2 { font-size: 21px; font-weight: 600; }
+.media-dialog-content header button { border: 0; background: transparent; width: 36px; height: 36px; font-size: 28px; }
+.gif-preview, .live-moment-video { display: block; width: 100%; max-height: min(55svh,520px); object-fit: contain; border-radius: 8px; background: #171513; }
+.media-note, .media-empty, .moment-selector { font-size: 12px; line-height: 1.6; }
+.moment-selector select { font: inherit; color: inherit; background: var(--cream); padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; }
+.media-dialog-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.media-dialog-actions .button { flex: 1; padding-inline: 12px; font-size: 13px; }
+@media (max-width: 480px) { .media-dialog-content { padding: 18px; } .media-dialog-content h2 { font-size: 18px; } }

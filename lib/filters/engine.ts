@@ -36,13 +36,27 @@ export function processPixels(data: Uint8ClampedArray, width: number, height: nu
     const offset=Math.round(width*p.chromatic*edge);
     let r=source[(y*width+Math.min(width-1,x+offset))*4]/255;
     let g=source[i+1]/255, b=source[(y*width+Math.max(0,x-offset))*4+2]/255;
-    // Channel balance, strongest in midtones; no flat color overlay.
-    r += p.temperature*.18*r*(1-r)*4 + p.tint*.04;
-    b -= p.temperature*.18*b*(1-b)*4;
-    g -= p.tint*.1*g*(1-g)*4;
+    const max=Math.max(r,g,b), min=Math.min(r,g,b), chroma=max-min;
+    let hue=0;
+    if(chroma>0)hue=((max===r?(g-b)/chroma:max===g?2+(b-r)/chroma:4+(r-g)/chroma)*60+360)%360;
+    // A soft warm-hue mask, not face detection: preserve texture and dark/light skin.
+    const skin=clamp(1-Math.abs(hue-28)/40)*clamp(chroma*6)*clamp((1-chroma/Math.max(.001,max))*2)*p.skinProtection;
+    const protection=1-skin;
+    const band=hue/60, index=Math.floor(band), mix=band-index;
+    const colorSat=p.colors[index]*(1-mix)+p.colors[(index+1)%6]*mix;
+    const originalLuma=.25*r+.65*g+.1*b;
+    const shadows=(1-originalLuma)**3*protection, highlightsWeight=originalLuma**3;
+    r += p.temperature*.18*r*(1-r)*4*protection + p.tint*.04*protection + p.shadowTone[0]*shadows + p.highlightTone[0]*highlightsWeight;
+    b -= p.temperature*.18*b*(1-b)*4*protection;
+    b += p.shadowTone[2]*shadows+p.highlightTone[2]*highlightsWeight;
+    g -= p.tint*.1*g*(1-g)*4*protection;
+    g += p.shadowTone[1]*shadows+p.highlightTone[1]*highlightsWeight;
     const luma=.25*r+.65*g+.1*b;
     if (p.monochrome) r=g=b=luma;
-    else { r=luma+(r-luma)*p.saturation; g=luma+(g-luma)*p.saturation; b=luma+(b-luma)*p.saturation; }
+    else {
+      const saturation=1+(p.saturation-1)* (1-skin*.55)+colorSat*protection;
+      r=luma+(r-luma)*saturation;g=luma+(g-luma)*saturation;b=luma+(b-luma)*saturation;
+    }
     const shade=1-p.vignette*edge*edge;
     const grain=(noise(Math.floor(x/width*900),Math.floor(y/height*900),seed)+noise(Math.floor(x/width*450),Math.floor(y/height*450),seed+7)*.4)*p.grain*(.4+.6*(1-luma));
     data[i]=255*clamp(lut[Math.round(clamp(r)*4095)]*shade+grain);

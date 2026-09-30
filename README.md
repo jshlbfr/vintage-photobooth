@@ -1,9 +1,11 @@
 # Vintage Photobooth
 
-Milestone 5 adds an editable sticker/text composition and free high-resolution PNG
-export, plus a longer full-viewport camera flash. Camera photos, optional audio,
-motion and final strips remain local in the browser.
-See [the Milestone 5 report](docs/milestone-5.md) for architecture, validation and limits.
+Milestone 6 adds ten photographic presets, local animated GIF export, and Live
+Moment playback/download with optional recorded audio. The editable sticker/text
+composition, free high-resolution PNG export and full-viewport flash remain.
+All media stays local in the browser.
+See [the Milestone 6 report](docs/milestone-6.md) for architecture, validation and limits.
+The [Milestone 5 report](docs/milestone-5.md) covers the composition editor.
 Earlier reports cover [Milestone 4](docs/milestone-4.md) and
 [capture/layout refinements](docs/capture-refinements.md).
 Reference screenshots are never rendered as the interface.
@@ -50,7 +52,11 @@ the short shutter window. All camera/microphone tracks stop on leaving Setup/
 Capture; media remains local and is released when removed or the session resets.
 
 Stickers and text remain editable, and Download Photo exports a free PNG.
-GIF, final Live Moment playback/export, QR and ads remain unavailable. No user media is uploaded, and no persistent storage or
+Generate GIF creates a looping photo sequence with each photo’s selected filter.
+Generate Live Moment opens the available original camera recordings, with audio
+only when explicitly enabled and permitted. Motion video is unfiltered.
+GIF and Live Moment are directly testable; QR and ads remain unavailable.
+No user media is uploaded, and no persistent storage or
 backend is implemented. Print never invokes browser/system printing. Reduced
 motion skips the animation; both modes require clicking See Your Photos.
 
@@ -81,7 +87,8 @@ motion skips the animation; both modes require clicking See Your Photos.
 - `lib/editor/` and `components/editor/`: normalized decoration geometry, shared
   text metrics, pointer manipulation and compact editing controls.
 - `lib/render/strip-renderer.ts`: bounded, cancellable high-resolution PNG rendering.
-- `lib/design-data.ts`: frame colors/styles and eight original preview looks.
+- `lib/gif/`: bounded worker GIF rendering/encoding, with shared crop and filter logic.
+- `lib/design-data.ts`: frame colors/styles and ten photographic looks.
   Presets use the shared Canvas engine in `lib/filters/`. Original is the
   default and bypasses grading. Each capture retains its own filter ID.
 - `components/artwork/` and `lib/artwork.ts`: supplied decorative assets and
@@ -103,11 +110,12 @@ npm run build
 
 When Turbopack's port binding is unavailable: `npm run build -- --webpack`.
 Google Fonts are downloaded at build time and then self-hosted by Next.js;
-building requires access to Google Fonts. No application dependencies were added.
+building requires access to Google Fonts. Milestone 6 adds `modern-gif@2.1.0`
+for local palette-based GIF encoding with dithering inside a worker.
 
 Tests use native TypeScript stripping and a local import-resolution hook,
 validated on Node 24. No test runner package was added. The earlier milestone
-reports remain historical references; `docs/milestone-5.md` records current
+reports remain historical references; `docs/milestone-6.md` records current
 behavior and validation.
 
 Optional camera integration checks use an existing Chromium executable with
@@ -121,3 +129,8 @@ It remains enabled with reduced motion when the user selects Flash. The source
 still always comes from the camera video, independent of the overlay.
 
 Editor/export integration: `CHROMIUM_PATH=/path/to/chrome-headless-shell node tests/browser-editor.mjs`.
+
+GIF/Live Moment integration: `CHROMIUM_PATH=/path/to/chrome-headless-shell node tests/browser-motion.mjs`.
+GIF generation requires Worker and OffscreenCanvas support; unsupported browsers
+retain PNG download and receive a useful error. Live Moment playback/container
+support depends on the browser. Download always preserves the recorded Blob.

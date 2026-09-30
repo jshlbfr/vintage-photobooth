@@ -101,7 +101,7 @@ try {
    await click('.camera-empty button');await waitFor(`document.querySelector('video')?.readyState>=2&&!document.querySelector('.camera-empty')`,'camera');
    assert(await evaluate(`getComputedStyle(document.querySelector('video')).filter==='none'&&!document.querySelector('.live-filter-canvas')`),'Original has processing');
    await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
-   await click('.setup-continue');await route('/capture');await waitFor(`document.querySelectorAll('.filter-thumbnail img').length===9`,'filter thumbnails');
+   await click('.setup-continue');await route('/capture');await waitFor(`document.querySelectorAll('.filter-thumbnail img').length===10`,'filter thumbnails');
    assert(await evaluate(`document.querySelector('[aria-label="Original"]').getAttribute('aria-pressed')==='true'`),'Original default');
    await center('.capture-strip');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
  };
@@ -122,15 +122,15 @@ try {
      await click('.capture-actions button:last-child');
      if(count===8){
        await delay(250);await click('[aria-label="Pause capture"]');await waitFor(`document.querySelector('.capture-actions button:last-child').textContent==='Resume'`,'pause');await delay(1200);assert(await progress()===0,'ghost capture after pause');
-       await click('[aria-label="Golden hour"]');await click('.capture-actions button:last-child');await waitCount(3);await click('[aria-label="Pause capture"]');await waitFor(`document.querySelector('.capture-actions button:last-child').textContent==='Resume'`,'pause three');assert(await progress()===3,'pause lost count');
-       await click('[aria-label="Silver screen"]');await click('.capture-actions button:last-child');
+       await click('[aria-label="Golden Hour"]');await click('.capture-actions button:last-child');await waitCount(3);await click('[aria-label="Pause capture"]');await waitFor(`document.querySelector('.capture-actions button:last-child').textContent==='Resume'`,'pause three');assert(await progress()===3,'pause lost count');
+       await click('[aria-label="Mono"]');await click('.capture-actions button:last-child');
      }
      await waitCount(count);await waitFor(`!!document.querySelector('a.choose-frame')`,'sequence complete');await assertFlash(count);
    } else await upload(count);
    await center('.capture-strip');await layout(1440,1024,count===8);
    const composition=await evaluate(`({box:document.querySelector('.capture-strip svg').getAttribute('viewBox'),slots:[...document.querySelectorAll('.capture-strip clipPath[id*="-slot-"] rect')].map(n=>({x:n.getAttribute('x'),y:n.getAttribute('y')}))})`);
    assert(new Set(composition.slots.map(s=>s.x)).size===(count>=6?2:1),'wrong columns');
-   if(count===8){await waitFor(`document.querySelectorAll('.capture-strip image').length===8`,'processed images');assert(await evaluate(`JSON.stringify([...document.querySelectorAll('.capture-strip image')].map(n=>n.dataset.filter))===JSON.stringify(['golden-hour','golden-hour','golden-hour','silver-screen','silver-screen','silver-screen','silver-screen','silver-screen'])`),'per-capture filter lost');}
+   if(count===8){await waitFor(`document.querySelectorAll('.capture-strip image').length===8`,'processed images');assert(await evaluate(`JSON.stringify([...document.querySelectorAll('.capture-strip image')].map(n=>n.dataset.filter))===JSON.stringify(['golden-hour','golden-hour','golden-hour','mono','mono','mono','mono','mono'])`),'per-capture filter lost');}
    await click('.choose-frame');await route('/customize');assert(await evaluate(`qa.tracks.every(t=>t.readyState==='ended')`),'hardware remained on');
    for(let f=0;f<9;f++){await center('.customize-preview');await click('[aria-label="Next frame"]');}
    await click('[aria-label="Vanilla"]');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
@@ -145,10 +145,10 @@ try {
  }
  console.log('M4 manual/filter/timer checks');
  await start(4,1);await click('[aria-label="Screen flash"]');await click('.capture-actions button:last-child');await waitCount(1);await delay(1500);assert(await progress()===1,'manual continued');assert(await evaluate('qa.flashes.length===0'),'flash off');
- await click('[aria-label="Golden hour"]');await click('.capture-actions button:last-child');await waitCount(2);
- await click('[aria-label="Silver screen"]');await click('.capture-actions button:last-child');await waitCount(3);
+ await click('[aria-label="Golden Hour"]');await click('.capture-actions button:last-child');await waitCount(2);
+ await click('[aria-label="Mono"]');await click('.capture-actions button:last-child');await waitCount(3);
  await click('[aria-label="Original"]');await click('.capture-actions button:last-child');await waitCount(4);await waitFor(`document.querySelectorAll('.capture-strip image').length===4`,'filters');
- assert(await evaluate(`JSON.stringify([...document.querySelectorAll('.capture-strip image')].map(n=>n.dataset.filter))===JSON.stringify(['original','golden-hour','silver-screen','original'])`),'manual filter assignment');
+ assert(await evaluate(`JSON.stringify([...document.querySelectorAll('.capture-strip image')].map(n=>n.dataset.filter))===JSON.stringify(['original','golden-hour','mono','original'])`),'manual filter assignment');
  await click('.capture-feedback button');await waitCount(0);await waitFor(`![...qa.urls.values()].some(b=>b.type.startsWith('video/'))`,'motion cleanup');
  for(const timer of [5,10]){
    await start(2,timer);await click('.capture-actions button:last-child');await waitCount(2);await assertFlash(2);
