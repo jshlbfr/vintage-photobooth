@@ -7,6 +7,7 @@ import { useMedia } from "./media-provider";
 import { captureStill, decodeUpload } from "@/lib/media/still-image";
 import { beginMotion } from "@/lib/media/motion-recorder";
 import { runCountdown, wait } from "@/lib/media/countdown";
+import { CaptureSound } from '@/lib/media/capture-sound';
 import { afterPaint } from '@/lib/media/paint';
 import type { Capture, MediaReference } from "@/lib/session/types";
 
@@ -21,10 +22,12 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
   const [message,setMessage] = useState('');
   const operation=useRef<AbortController|null>(null);
   const mounted=useRef(false), pauseRequested=useRef(false);
+  const sound=useRef<CaptureSound|null>(null);
+  useEffect(()=>()=>{sound.current?.dispose();sound.current=null;},[session.id]);
   const recorder=useRef<ReturnType<typeof beginMotion>>(null);
   const transition=(next:Phase)=>{phaseRef.current=next;if(mounted.current)setPhase(next);};
   const cancel=useCallback(()=>{
-    operation.current?.abort();recorder.current?.cancel();recorder.current=null;
+    sound.current?.stop();operation.current?.abort();recorder.current?.cancel();recorder.current=null;
   },[]);
   useEffect(()=>{
     mounted.current=true;
@@ -45,22 +48,25 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
   const capture=async()=>{
     if(operation.current||complete||state.status!=='ready'||!video.current)return;
     const element=video.current,controller=new AbortController();operation.current=controller;
+    if(session.preferences.captureSound){sound.current??=new CaptureSound();sound.current.unlock();}
     pauseRequested.current=false;setMessage('');
     let count=session.captures.length;
     const allocated:MediaReference[]=[];
     try {
       do {
         transition('counting');
-        await runCountdown(session.preferences.timerSeconds,controller.signal,remaining=>{
-          setCountdown(remaining);
-          if(remaining===1){const stream=camera.getRecordingStream();recorder.current=stream?beginMotion(stream):null;}
+        await runCountdown(session.preferences.timerSeconds-1,controller.signal,remaining=>{
+          const shown=remaining+1;
+          if(shown>1){setCountdown(shown);if(session.preferences.captureSound)sound.current?.beep();}
+          if(shown<=2&&!recorder.current){const stream=camera.getRecordingStream();recorder.current=stream?beginMotion(stream):null;}
         });
         controller.signal.throwIfAborted();
         if(element.readyState<2||!element.videoWidth)throw new Error('The camera is warming up. Try again in a moment.');
         transition('capturing');
+        flushSync(()=>{setCountdown(1);if(session.preferences.flash)setFlash(true);});
+        if(session.preferences.captureSound)sound.current?.shutter();
         const flashStarted=performance.now();
         if(session.preferences.flash){
-          flushSync(()=>setFlash(true));
           await afterPaint(controller.signal);
           // Give the illuminated camera scene time to reach the incoming video.
           await wait(Math.max(0,120-(performance.now()-flashStarted)),controller.signal);

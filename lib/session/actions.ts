@@ -9,6 +9,7 @@ export type SessionAction =
   | { type: "camera/count"; count: PhotoCount }
   | { type: "camera/timer"; seconds: TimerSeconds }
   | { type: "camera/flash"; enabled: boolean }
+  | { type: "camera/sound"; enabled: boolean }
   | { type: "camera/audio"; enabled: boolean }
   | { type: "captures/begin" }
   | { type: "captures/restart" }
@@ -19,5 +20,5 @@ export type SessionAction =
   | { type: "customization/color"; color: FrameColor }
   | { type: "customization/stickers"; stickers: readonly PlacedSticker[] }
   | { type: "customization/texts"; texts: readonly PlacedText[] }
-  | { type: "rewards/unlock" }
+  | { type: "rewards/unlock"; receipt?: string }
   | { type: "outputs/record"; kind: OutputKind; output: GeneratedOutput };

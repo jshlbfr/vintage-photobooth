@@ -8,6 +8,7 @@ export type CameraPreferences = {
   timerSeconds: TimerSeconds;
   flash: boolean;
   audioEnabled: boolean;
+  captureSound: boolean;
 };
 
 /** Local resources are references into a browser-owned media store.
@@ -50,7 +51,7 @@ export type Customization = {
   stickers: readonly PlacedSticker[];
   texts: readonly PlacedText[];
 };
-export type OutputKind = "photo" | "gif" | "live-moment";
+export type OutputKind = "photo" | "gif" | "live-strip" | "full-live-moment";
 export type GeneratedOutput = { resourceId: string; mimeType: string; createdAt: number };
 export type PhotoBoothSession = {
   id: string;
@@ -59,6 +60,6 @@ export type PhotoBoothSession = {
   capturePlanReady: boolean;
   captures: readonly Capture[];
   customization: Customization;
-  rewards: { enhancedFeaturesUnlocked: boolean };
+  rewards: { enhancedFeaturesUnlocked: boolean; shareReceipt?: string };
   outputs: Partial<Record<OutputKind, GeneratedOutput>>;
 };

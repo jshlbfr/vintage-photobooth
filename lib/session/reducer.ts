@@ -31,6 +31,8 @@ export function sessionReducer(session: PhotoBoothSession | null, action: Sessio
         customization: { ...session.customization, frameId: frame && supportsPhotoCount(frame, action.count) ? frame.id : "classic" },
       };
     }
+    case "camera/sound":
+      return { ...session, preferences: { ...session.preferences, captureSound: action.enabled } };
     case "camera/audio":
       return { ...session, preferences: { ...session.preferences, audioEnabled: action.enabled } };
     case "captures/begin": return { ...session, capturePlanReady: true };
@@ -49,7 +51,7 @@ export function sessionReducer(session: PhotoBoothSession | null, action: Sessio
       return FRAME_COLORS.some(color => color.value === action.color) ? customize(session, { frameColor: action.color }) : session;
     case "customization/stickers": return customize(session, { stickers: action.stickers });
     case "customization/texts": return customize(session, { texts: action.texts });
-    case "rewards/unlock": return { ...session, rewards: { enhancedFeaturesUnlocked: true } };
+    case "rewards/unlock": return { ...session, rewards: { enhancedFeaturesUnlocked: true, ...(action.receipt?{shareReceipt:action.receipt}:{}) } };
     case "outputs/record": return { ...session, outputs: { ...session.outputs, [action.kind]: action.output } };
   }
 }

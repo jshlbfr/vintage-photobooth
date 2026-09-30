@@ -25,6 +25,7 @@ export function CameraSetup() {
         <option value="">Default camera</option>{state.devices.filter(device => device.id).map(device => <option key={device.id} value={device.id}>{device.label}</option>)}
       </select>
       <div className="mirror-control audio-control"><span>Live Moment Audio</span><Switch checked={session.preferences.audioEnabled} onChange={toggleAudio} label="Live Moment Audio" /></div>
+      <div className="mirror-control"><span>Capture Sound</span><Switch checked={session.preferences.captureSound} onChange={(enabled) => dispatch({ type: "camera/sound", enabled })} label="Capture Sound" /></div>
       <div className="mirror-control"><span>Mirror Camera</span><Switch checked={mirrored} onChange={(mirrored) => dispatch({ type: "camera/mirror", mirrored })} label="Mirror Camera" /></div>
       <span>Photo Count</span><SegmentedControl label="Photo count" values={PHOTO_COUNTS} value={photoCount} onChange={(count) => dispatch({ type: "camera/count", count })} />
       <span>Timer</span><SegmentedControl label="Timer" values={TIMERS} value={timerSeconds} onChange={(seconds) => dispatch({ type: "camera/timer", seconds })} suffix="s" />

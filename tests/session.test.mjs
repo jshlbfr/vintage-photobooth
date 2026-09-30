@@ -55,7 +55,7 @@ test("preferences, filter, geometry and all colors survive unrelated changes", (
       assert.equal(session.captures, captures);
     }
   }
-  assert.deepEqual(session.preferences, { photoCount: 6, deviceId: "sample-rear", mirrored: false, timerSeconds: 10, flash: false, audioEnabled: false });
+  assert.deepEqual(session.preferences, { photoCount: 6, deviceId: "sample-rear", mirrored: false, timerSeconds: 10, flash: false, audioEnabled: false, captureSound: true });
 });
 
 test("changing count invalidates old captures/outputs and re-prepares exactly the new count", () => {

@@ -35,17 +35,17 @@ async function grade(work:HTMLCanvasElement,filter:FilterId,signal:AbortSignal){
 }
 
 /** Draw original media + shared geometry. No DOM capture, preview textures or UI. */
-export async function renderStrip(composition:StripComposition,signal:AbortSignal,onProgress?:(done:number,total:number)=>void){
+export async function renderStrip(composition:StripComposition,signal:AbortSignal,onProgress?:(done:number,total:number)=>void, options?:{dimensions?:{width:number;height:number};layer?:'base'|'decorations'}){
   await document.fonts.ready;signal.throwIfAborted();
-  const layout=getStripLayout(composition),dimensions=exportDimensions(layout);
+  const layout=getStripLayout(composition),dimensions=options?.dimensions ? {...options.dimensions,scale:options.dimensions.width/layout.width} : exportDimensions(layout);
   const canvas=document.createElement('canvas'),work=document.createElement('canvas');
   canvas.width=dimensions.width;canvas.height=dimensions.height;
   try{
     const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Image rendering is unavailable in this browser.');
     ctx.scale(canvas.width/layout.width,canvas.height/layout.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
     ctx.beginPath();ctx.roundRect(0,0,layout.width,layout.height,layout.radius);ctx.clip();
-    ctx.fillStyle=composition.frameColor;ctx.fillRect(0,0,layout.width,layout.height);
-    for(let i=0;i<layout.slots.length;i++){
+    if(options?.layer!=='decorations'){ctx.fillStyle=composition.frameColor;ctx.fillRect(0,0,layout.width,layout.height);}
+    for(let i=0;options?.layer!=='decorations'&&i<layout.slots.length;i++){
       signal.throwIfAborted();const slot=layout.slots[i],photo=composition.photos[i];
       if(!photo?.src)throw new Error('A photograph is missing. Return to Capture and try again.');
       const image=await loadImage(photo.src,signal);
@@ -66,7 +66,7 @@ export async function renderStrip(composition:StripComposition,signal:AbortSigna
         ctx.restore();onProgress?.(i+1,layout.slots.length);await pause();
       }finally{image.src='';work.width=0;work.height=0;}
     }
-    for(const element of orderedElements(composition)){
+    for(const element of options?.layer==='base'?[]:orderedElements(composition)){
       signal.throwIfAborted();ctx.save();ctx.translate(element.x*layout.width,element.y*layout.height);ctx.rotate(element.rotation*Math.PI/180);
       if(element.type==='sticker'){
         const image=await loadImage(STICKER_ASSETS[element.assetId].src,signal),size=stickerDimensions(element,layout);
@@ -77,7 +77,7 @@ export async function renderStrip(composition:StripComposition,signal:AbortSigna
       }
       ctx.restore();
     }
-    if(composition.caption&&layout.captionY!==undefined){ctx.font=`18px ${fontFamily('script')}`;ctx.textAlign='center';ctx.fillStyle='#F3E9D2';ctx.fillText(composition.caption,layout.width/2,layout.captionY);}
+    if(options?.layer!=='base'&&composition.caption&&layout.captionY!==undefined){ctx.font=`18px ${fontFamily('script')}`;ctx.textAlign='center';ctx.fillStyle='#F3E9D2';ctx.fillText(composition.caption,layout.width/2,layout.captionY);}
     signal.throwIfAborted();
     const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('The PNG could not be saved. Please try again.')),'image/png'));
     signal.throwIfAborted();return {blob,width:canvas.width,height:canvas.height};

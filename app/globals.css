@@ -580,3 +580,15 @@ a.result-action:hover { background: #eadcc0; }
 .media-dialog-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .media-dialog-actions .button { flex: 1; padding-inline: 12px; font-size: 13px; }
 @media (max-width: 480px) { .media-dialog-content { padding: 18px; } .media-dialog-content h2 { font-size: 18px; } }
+
+.video-output-tabs { display: flex; gap: 8px; }
+.video-output-tabs button { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 10px 8px; font-size: 12px; }
+.video-output-tabs button[aria-pressed="true"] { background: var(--ink); color: var(--cream); }
+.live-strip-preview { display: flex; justify-content: center; min-height: 120px; }
+.live-strip-preview canvas { display: block; max-width: 100%; max-height: 48svh; width: auto; height: auto; object-fit: contain; }
+.share-qr { width: min(100%,260px); align-self: center; }
+.share-link { overflow-wrap: anywhere; font-size: 11px; text-decoration: underline; }
+.public-share { max-width: 520px; display: flex; align-items: center; flex-direction: column; gap: 24px; text-align: center; }
+.public-share img { max-width: 100%; max-height: 65svh; object-fit: contain; }
+/* Fit the additional independent sound control without compressing the setup controls. */
+@media (min-width: 801px) and (max-height: 850px) { .setup-panel .camera-preview { max-height: 23svh; } }
