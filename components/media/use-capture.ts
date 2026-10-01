@@ -57,7 +57,7 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
         transition('counting');
         await runCountdown(session.preferences.timerSeconds-1,controller.signal,remaining=>{
           const shown=remaining+1;
-          if(shown>1){setCountdown(shown);if(session.preferences.captureSound)sound.current?.beep();}
+          if(shown>1){flushSync(()=>setCountdown(shown));if(session.preferences.captureSound)sound.current?.beep();}
           if(shown<=2&&!recorder.current){const stream=camera.getRecordingStream();recorder.current=stream?beginMotion(stream):null;}
         });
         controller.signal.throwIfAborted();

@@ -170,9 +170,13 @@ try {
  await fetch('http://127.0.0.1:9006/__test/fail?on=1');await action('Share via QR');await textButton('Create 10-minute QR share');await waitFor(`document.body.innerText.includes('Temporary sharing is unavailable')`,'network failure');await close();await fetch('http://127.0.0.1:9006/__test/fail?on=0');
  const cleanup=await fetch(origin+'/api/shares/cleanup',{method:'POST',headers:{Authorization:'Bearer fixture-cleanup-secret'}});assert(cleanup.ok,'physical cleanup');
  await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','all generated media cleanup');assert(await evaluate(`qa.videos.every(v=>!v.src||v.paused)`),'video decoder still playing');
+ console.log('M7 twelve-camera Live Strip');await start(12,1,'off',false);
+ for(let i=0;i<12;i++){await click('.capture-actions button:last-child');await waitCount(i+1);}
+ await results();await action('Generate Live Moment');await reward();await waitFor(`!!document.querySelector('.live-strip-preview canvas')`,'twelve motion slots',30000);
+ const many=await exportVideo('Live Strip');assert(many.audio===0&&many.height<=1440,'twelve-slot video');await close();await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','twelve-slot cleanup');
  for(const [timer,sound,audio] of [[1,true,'off'],[5,true,'off'],[10,true,'off'],[1,false,'denied']]){
    console.log('M7 timer',timer,'sound',sound,'audio',audio);await start(1,timer,audio,sound);await click('.capture-actions button:last-child');await waitCount(1);const events=await evaluate('qa.sounds');assert(events.filter(s=>s.kind==='beep').length===(sound?timer-1:0),'beep total '+JSON.stringify(events));assert(events.filter(s=>s.kind==='shutter').length===(sound?1:0),'shutter total');await assertFlash(1);
-   if(audio==='denied'){await results();await action('Generate Live Moment');await reward();const silent=await exportVideo('Full Live Moment');assert(silent.audio===0,'mic-denied full video audio');await close();}
+   if(audio==='denied'||timer===1){await results();await action('Generate Live Moment');await reward();const silent=await exportVideo('Full Live Moment');assert(silent.audio===0,'mic-denied full video audio');await close();}
  }
  await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','final reset');
  assert(!networkRequests.some(r=>r.url.includes('/frames/')),'custom frames used');

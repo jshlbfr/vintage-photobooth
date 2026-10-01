@@ -109,17 +109,6 @@ try {
    assert(await evaluate(`document.querySelector('[aria-label="Original"]').getAttribute('aria-pressed')==='true'`),'Original default');
    await center('.capture-strip');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
  };
- const assertFlash=async expected=>{
-   await delay(200);const q=await evaluate(`({flashes:qa.flashes,shots:qa.shots,ticks:qa.ticks})`);
-   assert(q.shots.length===expected&&q.flashes.length===expected,'flash/shot mismatch '+JSON.stringify(q));
-   for(const f of q.flashes)assert(f.color==='rgb(255, 255, 255)'&&f.opacity==='1'&&f.position==='fixed'&&f.z==='2147483647'&&f.parent==='BODY'&&f.x===0&&f.y===0&&f.w===f.vw&&f.h===f.vh&&f.duration>=350&&f.duration<550&&f.pointer==='none','flash style/timing '+JSON.stringify(f));
-   assert(q.shots.every(s=>s.flash),'video sampled before flash');
-   q.shots.forEach((shot,i)=>{const before=shot.at-q.flashes[i].at,after=q.flashes[i].duration-before;assert(before>=110&&after>=230,'flash illumination/hold timing '+before+'/'+after);});assert(!q.ticks.includes('1'),'countdown displayed 1');report.flashes.push(q);
- };
- const upload=async (count,target=count)=>{
-   await evaluate(`(async()=>{const c=document.createElement('canvas');c.width=160;c.height=200;const x=c.getContext('2d');x.fillStyle='#bf806b';x.fillRect(0,0,160,200);x.fillStyle='#334455';x.fillRect(0,0,60,100);const b=await new Promise(r=>c.toBlob(r));const d=new DataTransfer();for(let i=0;i<${count};i++)d.items.add(new File([b],'test'+i+'.png',{type:'image/png'}));const input=document.querySelector('input[type=file]');input.files=d.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);await waitCount(target);
- };
-
  const action=async title=>{await evaluate(`[...document.querySelectorAll('.result-action')].find(b=>b.textContent.includes(${JSON.stringify(title)})).click()`);await delay(60);};
  const results=async()=>{await click('.choose-frame');await route('/customize');await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print finished');await delay(200);assert(await evaluate(`location.pathname==='/print'&&qa.print===0`),'Print behavior');await click('.print-continuation a');await route('/results');};
  const close=()=>click('[aria-label="Close media preview"]');
@@ -155,6 +144,7 @@ try {
    const pngSamples=await evaluate(`(async()=>{const b=[...qa.urls.values()].findLast(b=>b.type==='image/png'),im=await createImageBitmap(b),c=document.createElement('canvas');c.width=im.width;c.height=im.height;const x=c.getContext('2d');x.drawImage(im,0,0);const svg=document.querySelector('.results-strip svg'),box=svg.viewBox.baseVal;const samples=[...svg.querySelectorAll('clipPath[id*="-slot-"] rect')].map(r=>[...x.getImageData(Math.floor((Number(r.getAttribute('x'))+Number(r.getAttribute('width'))*.5)*c.width/box.width),Math.floor((Number(r.getAttribute('y'))+Number(r.getAttribute('height'))*.5)*c.height/box.height),1,1).data].slice(0,3));im.close();return samples;})()`);
    pngSamples.forEach((s,i)=>s.forEach((v,k)=>assert(Math.abs(v-expected[i][k])<=7,'PNG per-photo filter '+i+' '+s+' expected '+expected[i])));
    const t=Date.now(),beats=await evaluate('qa.beats');await action('Generate GIF');
+   await waitFor(`document.body.innerText.includes('Complete development reward')`,'reward');await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent==='Complete development reward').click()`);
    await waitFor(`!!document.querySelector('a[download="vintage-photobooth.gif"]')`,'GIF ready',90000);
    const src=await evaluate(`document.querySelector('.gif-preview').src`),blob=await blobData(src),bytes=Buffer.from(blob.data,'base64');
    const gif=decode(bytes),frames=decodeFrames(bytes);assert(frames.length===count&&gif.looped&&gif.loopCount===0,'GIF sequence/loop');
@@ -170,25 +160,10 @@ try {
    await close();await action('Generate GIF');assert(await evaluate(`document.querySelector('.gif-preview').src`)===src,'GIF cache miss');
    await click('.media-dialog-actions button');await waitFor(`document.querySelector('.gif-preview')?.src!==${JSON.stringify(src)}`,'regenerate');await waitFor(`!qa.urls.has(${JSON.stringify(src)})`,'obsolete GIF revoke');
    await click('.media-dialog-actions button');await close();await delay(400);await action('Generate GIF');assert(await evaluate(`!document.querySelector('.media-dialog-actions button').disabled`),'cancel stuck busy');await close();
-   await action('Generate Live Moment');assert(await evaluate(`!!document.querySelector('.media-empty')&&!document.querySelector('.live-moment-video')`),'upload-only motion fallback');await close();
+   await action('Generate Live Moment');await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent==='Full Live Moment').click()`);await waitFor(`!!document.querySelector('.media-empty')&&!document.querySelector('.live-moment-video')`,'upload-only motion fallback');await close();
    await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','GIF reset cleanup');report.counts.push(count);
  }
- for(const audio of ['on','off','denied']){
-   console.log('M6 Live Moment',audio);await start(4,1,audio);
-   for(let i=0;i<2;i++){await click('.capture-actions button:last-child');await waitCount(i+1);}
-   await assertFlash(2);await upload(2,4);await results();await action('Generate Live Moment');
-   await waitFor(`document.querySelector('.live-moment-video')?.readyState>=2`,'video ready');
-   const state=await evaluate(`(()=>{const v=document.querySelector('.live-moment-video');return {paused:v.paused,inline:v.playsInline,options:[...document.querySelectorAll('.moment-selector option')].map(o=>o.textContent),note:document.querySelector('.media-note').textContent,src:v.src,name:document.querySelector('dialog a[download]').download,audioCalls:qa.calls.filter(c=>c.audio).length};})()`);
-   assert(state.paused&&state.inline,'unexpected autoplay or fullscreen');assert(state.options.join(',')==='Photo 1,Photo 2','mixed media selector');assert(state.note.includes(audio==='on'?'Recorded with audio':'Silent'),'audio status');assert(audio!=='off'||state.audioCalls===0,'microphone used when off');
-   await cdp('Runtime.evaluate',{expression:`document.querySelector('.live-moment-video').play()`,awaitPromise:true,userGesture:true});await waitFor(`document.querySelector('.live-moment-video').currentTime>.1`,'video playback');
-   const tracks=await evaluate(`(()=>{const v=document.querySelector('.live-moment-video'),s=v.captureStream();return s.getAudioTracks().length;})()`);assert(tracks===(audio==='on'?1:0),'recorded audio track mismatch '+tracks);
-   const blob=await blobData(state.src),bytes=Buffer.from(blob.data,'base64');assert(blob.type.startsWith('video/webm')&&state.name.endsWith('.webm'),'actual MIME/extension');
-   await saveDownload('dialog a[download]',state.name,bytes);await writeFile(out+'/live-'+audio+'.webm',bytes);
-   await evaluate(`(()=>{const s=document.querySelector('.moment-selector select');s.value='1';s.dispatchEvent(new Event('change',{bubbles:true}));})()`);await waitFor(`document.querySelector('.live-moment-video')?.src!==${JSON.stringify(state.src)}`,'select next moment');assert(await evaluate(`document.querySelector('.live-moment-video').paused`),'next video autoplay');
-   await layout(390,844);const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(out+'/live-'+audio+'.png',Buffer.from(shot.data,'base64'));await close();
-   await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','motion cleanup');assert(await evaluate(`qa.tracks.every(t=>t.readyState==='ended')`),'live hardware track leak');report.checks.push({audio,...state,tracks,bytes:bytes.length});
- }
- assert(networkRequests.every(r=>r.method==='GET'&&(r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:'))),'media upload or external request');
+ assert(networkRequests.every(r=>(r.method==='GET'&&(r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:')))||(r.method==='POST'&&r.url===origin+'/api/reward/development')),'media upload or external request');
  assert(!networkRequests.some(r=>r.url.includes('/frames/')),'custom frames used');assert(errors.length===0,'browser errors '+JSON.stringify(errors));
  console.log(JSON.stringify({exports:report.exports,checks:report.checks,layouts:report.layouts.length,errors},null,2));
 } finally {await writeFile(out+'/report.json',JSON.stringify(report,null,2));browser.kill();for(const promise of pending.values())clearTimeout(promise.timer);}

@@ -1,11 +1,12 @@
 # Vintage Photobooth
 
-Milestone 6 adds ten photographic presets, local animated GIF export, and Live
-Moment playback/download with optional recorded audio. The editable sticker/text
-composition, free high-resolution PNG export and full-viewport flash remain.
-All media stays local in the browser.
-See [the Milestone 6 report](docs/milestone-6.md) for architecture, validation and limits.
-The [Milestone 5 report](docs/milestone-5.md) covers the composition editor.
+Milestone 7 adds optional countdown/shutter sound, two distinct video outputs
+(Live Strip and Full Live Moment), one session reward unlock, and temporary
+10-minute QR sharing. PNG, GIF, video and audio processing remain local; only
+an explicitly requested final PNG share is uploaded.
+See [the Milestone 7 report](docs/milestone-7.md) and
+[Supabase setup instructions](docs/sharing-setup.md). No live backend or real
+advertising provider is configured by default.
 Earlier reports cover [Milestone 4](docs/milestone-4.md) and
 [capture/layout refinements](docs/capture-refinements.md).
 Reference screenshots are never rendered as the interface.
@@ -51,13 +52,20 @@ varies by browser; stills work when recording is unavailable. Clips record only
 the short shutter window. All camera/microphone tracks stop on leaving Setup/
 Capture; media remains local and is released when removed or the session resets.
 
+Capture Sound defaults on and is independent of microphone recording. It uses
+original synthesized beeps and a short shutter effect, with no voice or audio asset.
 Stickers and text remain editable, and Download Photo exports a free PNG.
 Generate GIF creates a looping photo sequence with each photo’s selected filter.
 Generate Live Moment opens the available original camera recordings, with audio
 only when explicitly enabled and permitted. Motion video is unfiltered.
-GIF and Live Moment are directly testable; QR and ads remain unavailable.
-No user media is uploaded, and no persistent storage or
-backend is implemented. Print never invokes browser/system printing. Reduced
+GIF, Live Strip, Full Live Moment and QR share one reward unlock. Download Photo
+is always free. The local development adapter is clearly labelled and must be
+explicitly enabled; production fails gracefully without a real provider.
+Live Strip preserves the customized design with synchronized muted motion.
+Full Live Moment compiles clips chronologically with recorded audio, without
+the strip design. Motion color is unfiltered in both outputs.
+QR uses private Supabase storage and enforces exactly ten minutes on the server.
+It requires the setup above; no account is needed. Print never invokes browser/system printing. Reduced
 motion skips the animation; both modes require clicking See Your Photos.
 
 ## Architecture
@@ -97,7 +105,8 @@ motion skips the animation; both modes require clicking See Your Photos.
 
 The `(booth)` layout applies the session guard. A future `app/share/[id]` route
 can remain outside the private booth flow. Custom PNG frames remain untouched
-and unused. All customization and output processing happens locally.
+and unused. All customization and output processing happens locally; QR sharing
+uploads only the requested final PNG through server-only routes.
 
 ## Validation
 
@@ -115,7 +124,7 @@ for local palette-based GIF encoding with dithering inside a worker.
 
 Tests use native TypeScript stripping and a local import-resolution hook,
 validated on Node 24. No test runner package was added. The earlier milestone
-reports remain historical references; `docs/milestone-6.md` records current
+reports remain historical references; `docs/milestone-7.md` records current
 behavior and validation.
 
 Optional camera integration checks use an existing Chromium executable with
@@ -134,3 +143,9 @@ GIF/Live Moment integration: `CHROMIUM_PATH=/path/to/chrome-headless-shell node 
 GIF generation requires Worker and OffscreenCanvas support; unsupported browsers
 retain PNG download and receive a useful error. Live Moment playback/container
 support depends on the browser. Download always preserves the recorded Blob.
+
+Milestone 7 integration: `CHROMIUM_PATH=/path/to/chrome-headless-shell node tests/browser-milestone7.mjs`.
+Run with the local development reward adapter and Supabase HTTP fixture as described
+in the report. `node tests/share-http.mjs` separately verifies the share API boundary.
+The fixture never contacts Supabase. A real deployment must apply the migration,
+provide server-only credentials, and schedule cleanup before QR sharing goes live.

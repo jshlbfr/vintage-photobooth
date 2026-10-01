@@ -118,6 +118,8 @@ try {
 
  const rect=selector=>evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,w:r.width,h:r.height};})()`);
  const drag=async(selector,dx,dy,touch=false)=>{
+   await cdp('Page.bringToFront');
+   await evaluate(`if(!window.editorPointerLog){window.editorPointerLog=[];for(const t of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'])document.addEventListener(t,e=>editorPointerLog.push({t:e.type,target:e.target.getAttribute('class'),button:e.button,buttons:e.buttons,id:e.pointerId}),true);}`);
    const p=await rect(selector);
    if(touch){await cdp('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:p.x,y:p.y,id:1}]});for(let i=1;i<=6;i++)await cdp('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+dx*i/6,y:p.y+dy*i/6,id:1}]});await cdp('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});}
    else{await cdp('Input.dispatchMouseEvent',{type:'mousePressed',x:p.x,y:p.y,button:'left',clickCount:1});for(let i=1;i<=6;i++)await cdp('Input.dispatchMouseEvent',{type:'mouseMoved',x:p.x+dx*i/6,y:p.y+dy*i/6,buttons:1});await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',x:p.x+dx,y:p.y+dy,button:'left',clickCount:1});}
@@ -133,7 +135,7 @@ try {
    if(count===2){await upload(1);await click('[aria-label="Original"]');await upload(1,2);}else await upload(count);await click('.choose-frame');await route('/customize');await evaluate('document.fonts.ready');
    await click('[aria-label="Add heart sticker"]');await click('[aria-label="Add heart sticker"]');await click('[aria-label="Add camera sticker"]');
    const initial=await decorations();assert(initial.length===3&&new Set(initial.map(e=>e.id)).size===3,'independent stickers');assert(new Set(initial.map(e=>e.transform)).size===3,'stacked additions');
-   await drag('.editor-object:last-of-type',20,25);const moved=await decorations();assert(JSON.stringify(moved)!==JSON.stringify(initial),'mouse move failed');
+   await drag('.editor-object:last-of-type',20,25);await waitFor(`JSON.stringify([...document.querySelectorAll('.customize-preview [data-decoration-id]')].map(e=>e.getAttribute('transform')))!==${JSON.stringify(JSON.stringify(initial.map(e=>e.transform)))}`,'mouse move state',3000).catch(async error=>{const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(out+'/editor-pointer-failure.png',Buffer.from(shot.data,'base64'));await writeFile(out+'/editor-pointer-log.json',JSON.stringify(await evaluate('editorPointerLog'),null,2));throw error;});
    await drag('.editor-handle.resize',15,18);await drag('.editor-handle.rotate',20,5);
    await byText('Send backward');
    await click('.add-text');await setInput('.editor-inspector textarea','Summer\nmemories');
