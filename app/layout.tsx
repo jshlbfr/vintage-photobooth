@@ -5,6 +5,8 @@ import { SessionProvider } from "@/components/session/session-provider";
 import { MediaProvider } from "@/components/media/media-provider";
 import "./globals.css";
 
+import Script from "next/script";
+
 const uiFont = Poppins({
   variable: "--font-ui",
   subsets: ["latin"],
@@ -28,7 +30,8 @@ const scriptFont = Allura({
 
 export const metadata: Metadata = {
   title: { default: "Vintage Photobooth", template: "%s · Vintage Photobooth" },
-  description: "A little nostalgia. A memory to keep. Step inside the Vintage Photobooth.",
+  description:
+    "A little nostalgia. A memory to keep. Step inside the Vintage Photobooth.",
   icons: { icon: "/icon.svg" },
 };
 
@@ -38,7 +41,21 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${uiFont.variable} ${displayFont.variable} ${scriptFont.variable}`}
     >
-      <body><AmbientBackground /><a className="skip-link" href="#main-content">Skip to content</a><SessionProvider><MediaProvider>{children}</MediaProvider></SessionProvider></body>
+      <body>
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=YOUR_CLIENT_ID"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+        <AmbientBackground />
+        <a className="skip-link" href="#main-content">
+          Skip to content
+        </a>
+        <SessionProvider>
+          <MediaProvider>{children}</MediaProvider>
+        </SessionProvider>
+      </body>
     </html>
   );
 }
