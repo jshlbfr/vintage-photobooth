@@ -46,7 +46,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1193568598392219"
           crossOrigin="anonymous"
-          strategy="afterInteractive"
         />
         <AmbientBackground />
         <a className="skip-link" href="#main-content">
