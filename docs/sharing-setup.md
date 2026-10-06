@@ -18,8 +18,10 @@ All local outputs remain local; only the explicit Create QR action sends a PNG.
    the adapter as development and requires an explicit Complete action. A public
    production hostname refuses this adapter even if the variable is accidentally
    set. No real ad provider is included. A real provider must verify completion
-   server-side before calling the receipt issuer; merely opening an ad must never
-   grant a receipt. Without a provider, production enhanced actions fail gracefully.
+   server-side and add its own verified receipt type to the access validator; merely opening an ad must never
+   grant a receipt. Development receipts are explicitly rejected on public hosts,
+   even if signing secrets were reused. Without a provider, production enhanced
+   actions fail gracefully.
 4. Configure a trusted scheduler to call `POST /api/shares/cleanup` every minute
    with `Authorization: Bearer <CRON_SECRET>`. GET is also supported for schedulers
    that require it. Do not put the secret in a query string. Monitor non-2xx
@@ -44,6 +46,10 @@ the database deny at `now >= expires_at`; no signed storage URL, redirect, image
 optimizer URL or cacheable public object URL is exposed. Responses use no-store,
 nosniff and noindex headers. The share page also removes its image at expiry.
 Previously downloaded/copied bytes cannot be recalled; expiry prevents new reads.
+
+Your application host must allow 12 MiB request bodies and sufficient time for
+PNG validation/storage; platforms with lower limits need a smaller share bound
+or a separately reviewed upload design.
 
 The service role bypasses RLS, so it is isolated in server-only modules. Anonymous
 and authenticated browser roles receive no table/function privileges; a restrictive

@@ -1,12 +1,12 @@
 import {randomBytes} from 'node:crypto';
-import {sameOrigin,receiptOwner} from '@/lib/sharing/access';
+import {sameOrigin,receiptOwner,localDevelopment} from '@/lib/sharing/access';
 import {PRIVATE_HEADERS} from '@/lib/sharing/policy';
 import {readStrip} from '@/lib/sharing/upload';
 import {shareStore,type ShareRow} from '@/lib/sharing/supabase';
 export const runtime='nodejs';
 export async function POST(request:Request){
   if(!sameOrigin(request))return Response.json({error:'This share request is not allowed.'},{status:403,headers:PRIVATE_HEADERS});
-  const owner=receiptOwner(request.headers.get('authorization')?.replace(/^Bearer /,'')??'');
+  const owner=receiptOwner(request.headers.get('authorization')?.replace(/^Bearer /,'')??'',localDevelopment(request));
   if(!owner)return Response.json({error:'Complete a reward before sharing.'},{status:403,headers:PRIVATE_HEADERS});
   let bytes;try{bytes=await readStrip(request);}catch(error){return Response.json({error:error instanceof Error?error.message:'Invalid strip.'},{status:400,headers:PRIVATE_HEADERS});}
   let row:ShareRow|undefined;

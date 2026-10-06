@@ -1,7 +1,7 @@
 // Run against the local production build and tests/share-fixture.mjs only.
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
-import {get} from 'node:http';
+import {get,request as httpRequest} from 'node:http';
 const origin='http://127.0.0.1:3003',fixture='http://127.0.0.1:9006';
 await fetch(fixture+'/__test/reset');
 const request=(path,options={})=>fetch(origin+path,options);
@@ -28,5 +28,6 @@ const cleanup=await request('/api/shares/cleanup',{method:'POST',headers:{Author
 assert.equal((await upload()).status,201);assert.equal((await upload()).status,201);assert.equal((await upload()).status,503,'bounded per-session share creation');
 await fetch(fixture+'/__test/fail?on=1');assert.equal((await upload()).status,503);await fetch(fixture+'/__test/fail?on=0');
 const publicConfig=await new Promise((resolve,reject)=>{get(origin+'/api/reward/development',{headers:{Host:'public.example'}},r=>{let data='';r.on('data',c=>data+=c);r.on('end',()=>resolve(JSON.parse(data)));}).on('error',reject);});assert.equal(publicConfig.development,false);
+const publicUpload=await new Promise((resolve,reject)=>{const r=httpRequest(origin+'/api/shares',{method:'POST',headers:{Host:'public.example',Origin:'http://public.example',Authorization:'Bearer '+receipt,'Content-Type':'image/png','Content-Length':png.length}},r=>{r.resume();r.on('end',()=>resolve(r.statusCode));});r.on('error',reject);r.end(png);});assert.equal(publicUpload,403,'development receipt must not authorize public production sharing');
 console.log('Sharing HTTP checks passed: authorization, origin, PNG validation, private image delivery, exact TTL, expired denial, fresh IDs, rate bound, cleanup, outage and public-host reward denial.');
 await fetch(fixture+'/__test/reset');

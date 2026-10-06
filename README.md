@@ -56,8 +56,7 @@ Capture Sound defaults on and is independent of microphone recording. It uses
 original synthesized beeps and a short shutter effect, with no voice or audio asset.
 Stickers and text remain editable, and Download Photo exports a free PNG.
 Generate GIF creates a looping photo sequence with each photo’s selected filter.
-Generate Live Moment opens the available original camera recordings, with audio
-only when explicitly enabled and permitted. Motion video is unfiltered.
+Generate Live Moment offers Live Strip and Full Live Moment.
 GIF, Live Strip, Full Live Moment and QR share one reward unlock. Download Photo
 is always free. The local development adapter is clearly labelled and must be
 explicitly enabled; production fails gracefully without a real provider.
@@ -96,6 +95,9 @@ motion skips the animation; both modes require clicking See Your Photos.
   text metrics, pointer manipulation and compact editing controls.
 - `lib/render/strip-renderer.ts`: bounded, cancellable high-resolution PNG rendering.
 - `lib/gif/`: bounded worker GIF rendering/encoding, with shared crop and filter logic.
+- `lib/video/`: shared-geometry Live Strip and sequential Full Live Moment rendering.
+- `lib/rewards/`: provider contract, with an explicit local development adapter.
+- `lib/sharing/`, `app/api/shares/`: server-only PNG validation, private Supabase storage, expiry and cleanup.
 - `lib/design-data.ts`: frame colors/styles and ten photographic looks.
   Presets use the shared Canvas engine in `lib/filters/`. Original is the
   default and bypasses grading. Each capture retains its own filter ID.
@@ -103,8 +105,8 @@ motion skips the animation; both modes require clicking See Your Photos.
   actual stickers with responsive Next.js image handling.
 - `public/images/README.md`: sample photograph sources and licensing reference.
 
-The `(booth)` layout applies the session guard. A future `app/share/[id]` route
-can remain outside the private booth flow. Custom PNG frames remain untouched
+The `(booth)` layout applies the session guard. `app/share/[id]` is a minimal
+public route outside that guard. Custom PNG frames remain untouched
 and unused. All customization and output processing happens locally; QR sharing
 uploads only the requested final PNG through server-only routes.
 
