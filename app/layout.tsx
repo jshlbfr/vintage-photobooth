@@ -33,6 +33,9 @@ export const metadata: Metadata = {
   description:
     "A little nostalgia. A memory to keep. Step inside the Vintage Photobooth.",
   icons: { icon: "/icon.svg" },
+  other: {
+    "google-adsense-account": "ca-pub-1193568598392219",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
