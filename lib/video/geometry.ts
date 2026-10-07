@@ -13,4 +13,4 @@ export function motionCrop(width:number,height:number,motion:NonNullable<Capture
   const inside=getCoverCrop(base.width,base.height,targetWidth,targetHeight);
   return {x:base.x+inside.x,y:base.y+inside.y,width:inside.width,height:inside.height};
 }
-export function clipSeconds(capture:Capture){return Math.max(.2,Math.min(5,(capture.motion?.durationMs??1000)/1000));}
+export function clipSeconds(capture:Capture){return Math.max(.2,(capture.motion?.durationMs??1000)/1000);}

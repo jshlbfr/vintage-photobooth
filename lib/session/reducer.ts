@@ -1,5 +1,5 @@
 import { FILTER_PREVIEWS, FRAME_COLORS, PHOTO_COUNTS, TIMERS } from "../design-data";
-import { FRAME_STYLES, supportsPhotoCount } from "../frame-templates";
+import { FRAME_TEMPLATES, supportsPhotoCount } from "../frame-templates";
 import type { SessionAction } from "./actions";
 import type { Customization, PhotoBoothSession } from "./types";
 
@@ -23,12 +23,12 @@ export function sessionReducer(session: PhotoBoothSession | null, action: Sessio
       return { ...session, preferences: { ...session.preferences, flash: action.enabled } };
     case "camera/count": {
       if (!PHOTO_COUNTS.includes(action.count) || action.count === session.preferences.photoCount) return session;
-      const frame = FRAME_STYLES.find(entry => entry.id === session.customization.frameId);
+      const frame = FRAME_TEMPLATES.find(entry => entry.id === session.customization.frameId);
       return {
         ...session, preferences: { ...session.preferences, photoCount: action.count },
         // A different capture plan cannot keep an old, mismatched strip/output.
         capturePlanReady: false, captures: [], outputs: {},
-        customization: { ...session.customization, frameId: frame && supportsPhotoCount(frame, action.count) ? frame.id : "classic" },
+        customization: { ...session.customization, frameId: frame && supportsPhotoCount(frame, action.count) ? frame.id as Customization["frameId"] : "classic" },
       };
     }
     case "camera/sound":
@@ -40,12 +40,21 @@ export function sessionReducer(session: PhotoBoothSession | null, action: Sessio
     case "captures/add":
       if (action.sessionId !== session.id || !session.capturePlanReady || session.captures.length >= session.preferences.photoCount || session.captures.some(capture => capture.id === action.capture.id)) return session;
       return { ...session, captures: [...session.captures, action.capture], outputs: {} };
-    case "customization/replace": return customize(session, action.customization);
+    case "captures/motion":
+      if (action.sessionId !== session.id) return session;
+      return { ...session, captures: session.captures.map(capture => {
+        const moment = action.moments.find(moment => moment.id === capture.id);
+        return moment ? { ...capture, motion: moment.motion } : capture;
+      }), outputs: {} };
+    case "customization/replace": {
+      const frame = FRAME_TEMPLATES.find(entry => entry.id === action.customization.frameId);
+      return frame && supportsPhotoCount(frame, session.preferences.photoCount) ? customize(session, action.customization) : session;
+    }
     case "customization/filter":
       return FILTER_PREVIEWS.some(filter => filter.id === action.filterId) ? customize(session, { filterId: action.filterId }) : session;
     case "customization/frame": {
-      const frame = FRAME_STYLES.find(entry => entry.id === action.frameId);
-      return frame && supportsPhotoCount(frame, session.preferences.photoCount) ? customize(session, { frameId: frame.id }) : session;
+      const frame = FRAME_TEMPLATES.find(entry => entry.id === action.frameId);
+      return frame && supportsPhotoCount(frame, session.preferences.photoCount) ? customize(session, { frameId: frame.id as Customization["frameId"] }) : session;
     }
     case "customization/color":
       return FRAME_COLORS.some(color => color.value === action.color) ? customize(session, { frameColor: action.color }) : session;

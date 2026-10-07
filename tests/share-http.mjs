@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import {get,request as httpRequest} from 'node:http';
-const origin='http://127.0.0.1:3003',fixture='http://127.0.0.1:9006';
+const origin=process.env.PHOTOBOOTH_URL??'http://127.0.0.1:3003',fixture='http://127.0.0.1:9006';
 await fetch(fixture+'/__test/reset');
 const request=(path,options={})=>fetch(origin+path,options);
 const issue=await request('/api/reward/development',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({sessionId:crypto.randomUUID(),result:'completed'})});

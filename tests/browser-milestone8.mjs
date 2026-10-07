@@ -1,12 +1,12 @@
 // Optional integration check: uses Chromium synthetic devices, never a physical camera.
 // Run against npm run start -- --port 3003; set CHROMIUM_PATH to an installed executable.
 import { spawn } from 'node:child_process';
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, unlink } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import './register-typescript.mjs';
 
-const out = resolve('.review/m7');
-const origin = new URL(process.env.PHOTOBOOTH_URL ?? 'http://127.0.0.1:3003').origin;
+const out = resolve('.review/m8');
+const origin = new URL(process.env.PHOTOBOOTH_URL ?? 'http://127.0.0.1:3004').origin;
 const executable = process.env.CHROMIUM_PATH;
 if (!executable) throw new Error('Set CHROMIUM_PATH to a Chromium or chrome-headless-shell executable. Start the production server first.');
 await mkdir(resolve(out, 'media-browser-profile'), { recursive: true });
@@ -42,7 +42,7 @@ browser.stdio[4].on('data', chunk => {
     }
     if (message.method === 'Network.requestWillBeSent') networkRequests.push({url:message.params.request.url,method:message.params.request.method});
     if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
-    if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error' && !/googlesyndication\.com|doubleclick\.net/.test(message.params.entry.url??'')) errors.push(message.params.entry);
+    if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') errors.push(message.params.entry);
   }
 });
 function send(method, params = {}, sessionId) {
@@ -68,7 +68,8 @@ try {
  await cdp('Page.enable');await cdp('Runtime.enable');await cdp('Log.enable');await cdp('Network.enable');
  await cdp('Network.setBlockedURLs',{urls:['*googlesyndication.com*','*doubleclick.net*']});
  await cdp('Page.addScriptToEvaluateOnNewDocument',{source:`
- window.qa={sounds:[],videos:[],beats:0,calls:[],tracks:[],urls:new Map(),revoked:[],flashes:[],shots:[],ticks:[],denyAudio:false,print:0};window.print=()=>qa.print++;setInterval(()=>qa.beats++,16);
+ window.qa={recorders:[],stages:[],sounds:[],videos:[],beats:0,calls:[],tracks:[],urls:new Map(),revoked:[],flashes:[],shots:[],ticks:[],denyAudio:false,print:0};window.print=()=>qa.print++;setInterval(()=>qa.beats++,16);
+ const NativeRecorder=window.MediaRecorder;window.MediaRecorder=class extends NativeRecorder{constructor(...args){super(...args);const entry={at:performance.now(),starts:0,stops:0,pauses:0,resumes:0,bytes:0,audio:args[0].getAudioTracks().length};qa.recorders.push(entry);for(const name of ['start','stop','pause','resume']){const original=this[name].bind(this);this[name]=(...values)=>{entry[{start:'starts',stop:'stops',pause:'pauses',resume:'resumes'}[name]]++;if(name==='stop')entry.end=performance.now();return original(...values);};}this.addEventListener('dataavailable',e=>entry.bytes+=e.data.size);}};
  const makeElement=document.createElement.bind(document);document.createElement=function(tag,...args){const el=makeElement(tag,...args);if(tag==='video')qa.videos.push(el);return el;};
  const soundStart=AudioScheduledSourceNode.prototype.start;AudioScheduledSourceNode.prototype.start=function(...args){qa.sounds.push({kind:this instanceof OscillatorNode?'beep':'shutter',at:performance.now(),text:document.querySelector('.countdown')?.textContent,flash:!!document.querySelector('.screen-flash')});return soundStart.apply(this,args);};
  const bufferStart=AudioBufferSourceNode.prototype.start;AudioBufferSourceNode.prototype.start=function(...args){qa.sounds.push({kind:'shutter',at:performance.now(),text:document.querySelector('.countdown')?.textContent,flash:!!document.querySelector('.screen-flash')});return bufferStart.apply(this,args);};
@@ -79,7 +80,7 @@ try {
  document.addEventListener('DOMContentLoaded',()=>new MutationObserver(records=>{
    for(const r of records){for(const node of r.addedNodes){if(node.nodeType===1&&node.matches('.screen-flash')){const s=getComputedStyle(node),b=node.getBoundingClientRect();qa.flashes.push({at:performance.now(),color:s.backgroundColor,opacity:s.opacity,z:s.zIndex,position:s.position,pointer:s.pointerEvents,x:b.x,y:b.y,w:b.width,h:b.height,vw:innerWidth,vh:innerHeight,parent:node.parentElement.tagName});}}
    for(const node of r.removedNodes){if(node.nodeType===1&&node.matches('.screen-flash')){qa.flashes.at(-1).duration=performance.now()-qa.flashes.at(-1).at;}}}
-   const n=document.querySelector('.countdown')?.textContent;if(n&&qa.ticks.at(-1)!==n)qa.ticks.push(n);
+   const n=document.querySelector('.countdown')?.textContent;if(n&&qa.lastStage!==n){qa.ticks.push(n);qa.stages.push({text:n,at:performance.now()});}qa.lastStage=n;
  }).observe(document.body,{subtree:true,childList:true,characterData:true}));
  `});
  const layout=async(width,height=1024,shot=false)=>{
@@ -112,23 +113,12 @@ try {
    assert(await evaluate(`document.querySelector('[aria-label="Original"]').getAttribute('aria-pressed')==='true'`),'Original default');
    await center('.capture-strip');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
  };
- const assertFlash=async expected=>{
-   await waitFor(`!document.querySelector('.screen-flash')`,'flash finished');
-   await delay(200);const q=await evaluate(`({flashes:qa.flashes,shots:qa.shots,ticks:qa.ticks})`);
-   assert(q.shots.length===expected&&q.flashes.length===expected,'flash/shot mismatch '+JSON.stringify(q));
-   for(const f of q.flashes)assert(f.color==='rgb(255, 255, 255)'&&f.opacity==='1'&&f.position==='fixed'&&f.z==='2147483647'&&f.parent==='BODY'&&f.x===0&&f.y===0&&f.w===f.vw&&f.h===f.vh&&f.duration>=350&&f.duration<550&&f.pointer==='none','flash style/timing '+JSON.stringify(f));
-   assert(q.shots.every(s=>s.flash),'video sampled before flash');
-   q.shots.forEach((shot,i)=>{const before=shot.at-q.flashes[i].at,after=q.flashes[i].duration-before;assert(before>=110&&after>=230,'flash illumination/hold timing '+before+'/'+after);});assert(!q.ticks.includes('1'),'countdown displayed 1');report.flashes.push(q);
- };
- const upload=async (count,target=count)=>{
-   await evaluate(`(async()=>{const c=document.createElement('canvas');c.width=160;c.height=200;const x=c.getContext('2d');x.fillStyle='#bf806b';x.fillRect(0,0,160,200);x.fillStyle='#334455';x.fillRect(0,0,60,100);const b=await new Promise(r=>c.toBlob(r));const d=new DataTransfer();for(let i=0;i<${count};i++)d.items.add(new File([b],'test'+i+'.png',{type:'image/png'}));const input=document.querySelector('input[type=file]');input.files=d.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);await waitCount(target);
- };
-
  const action=async title=>{await evaluate(`[...document.querySelectorAll('.result-action')].find(b=>b.textContent.includes(${JSON.stringify(title)})).click()`);await delay(60);};
- const results=async()=>{await waitFor(`!!document.querySelector('a.choose-frame')`,'capture settled');await click('.choose-frame');await route('/customize');await click('[aria-label=\"Add heart sticker\"]');await click('.add-text');await evaluate(`(()=>{const e=document.querySelector('.editor-inspector textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'LIVE TEST');e.dispatchEvent(new Event('input',{bubbles:true}));})()`);await click('[aria-label=\"Vanilla\"]');await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print finished');await delay(200);assert(await evaluate(`location.pathname==='/print'&&qa.print===0`),'Print behavior');await click('.print-continuation a');await route('/results');};
+ const results=async()=>{await click('.choose-frame');await route('/customize');await click('[aria-label=\"Add heart sticker\"]');await click('.add-text');await evaluate(`(()=>{const e=document.querySelector('.editor-inspector textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'LIVE TEST');e.dispatchEvent(new Event('input',{bubbles:true}));})()`);await click('[aria-label=\"Vanilla\"]');await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print finished');await delay(200);assert(await evaluate(`location.pathname==='/print'&&qa.print===0`),'Print behavior');await click('.print-continuation a');await route('/results');};
  const close=()=>click('[aria-label="Close media preview"]');
  const blobData=url=>evaluate(`(async()=>{const b=qa.urls.get(${JSON.stringify(url)});return {type:b.type,size:b.size,data:await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result.slice(f.result.indexOf(';base64,')+8));f.readAsDataURL(b);})};})()`);
  const saveDownload=async(selector,name,expected)=>{
+   await unlink(out+'/downloads/'+name).catch(()=>{});
    await cdp('Runtime.evaluate',{expression:`document.querySelector(${JSON.stringify(selector)}).click()`,userGesture:true});let bytes;
    for(let i=0;i<100;i++){try{bytes=await readFile(out+'/downloads/'+name);if(bytes.equals(expected))break;}catch{}await delay(60);}
    assert(bytes?.equals(expected),'download bytes differ '+name+' saved='+bytes?.length+' expected='+expected.length);
@@ -137,53 +127,71 @@ try {
  const textButton=async text=>{await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent===${JSON.stringify(text)}).click()`);await delay(70);};
  const reward=async()=>{await waitFor(`document.body.innerText.includes('Complete development reward')`,'development reward');await textButton('Complete development reward');await waitFor(`!document.body.innerText.includes('Development reward —')`,'reward completion');};
  const exportVideo=async kind=>{
-   await textButton(kind);await textButton('Generate '+kind);await waitFor(`!!document.querySelector('dialog a[download]')`,'export '+kind,90000);
+   await textButton(kind);await textButton('Generate '+kind);await waitFor(`!!document.querySelector('dialog a[download]')`,'export '+kind,220000);
    const info=await evaluate(`(()=>{const v=document.querySelector('dialog video'),a=document.querySelector('dialog a[download]');return {src:v.src,name:a.download,paused:v.paused,inline:v.playsInline,muted:v.muted};})()`);
    const blob=await blobData(info.src);assert(blob.type.startsWith('video/')&&blob.size>1000,'empty/invalid export');assert(info.inline&&info.paused,'audible autoplay');
    const bytes=Buffer.from(blob.data,'base64');await saveDownload('dialog a[download]',info.name,bytes);await writeFile(out+'/'+info.name,bytes);
    await cdp('Runtime.evaluate',{expression:`document.querySelector('dialog video').play()`,awaitPromise:true,userGesture:true});await waitFor(`document.querySelector('dialog video').currentTime>.15`,'generated playback');
-   const decoded=await evaluate(`(()=>{const v=document.querySelector('dialog video'),s=v.captureStream(),c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const x=c.getContext('2d');x.drawImage(v,0,0);return {width:v.videoWidth,height:v.videoHeight,audio:s.getAudioTracks().length,pixel:[...x.getImageData(5,Math.floor(c.height/2),1,1).data]};})()`);
+   const decoded=await evaluate(`(()=>{const v=document.querySelector('dialog video'),s=v.captureStream(),c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const x=c.getContext('2d');x.drawImage(v,0,0);return {width:v.videoWidth,height:v.videoHeight,audio:s.getAudioTracks().length,photoPixel:[...x.getImageData(Math.floor(c.width*.5),Math.floor(c.height*.16),1,1).data],pixel:[...x.getImageData(5,Math.floor(c.height/2),1,1).data]};})()`);
    report.exports.push({kind,...info,...decoded,mime:blob.type,bytes:bytes.length});return decoded;
  };
- console.log('M7 sounds, synchronized strip, full video, reward and QR');
- await start(4,3,'on');await click('.capture-actions button:last-child');await delay(300);await click('[aria-label="Pause capture"]');await waitFor(`document.querySelector('.capture-actions button:last-child').textContent==='Resume'`,'pause countdown');await delay(1100);
- assert(await evaluate(`qa.sounds.filter(s=>s.kind==='shutter').length===0`),'shutter after pause');
- await click('.capture-actions button:last-child');await waitCount(2);await click('[aria-label="Pause capture"]');await waitFor(`document.querySelector('.capture-actions button:last-child').textContent==='Resume'`,'pause second');await upload(2,4);await assertFlash(2);
- const sounds=await evaluate('qa.sounds');assert(sounds.filter(s=>s.kind==='shutter').length===2,'shutter count '+JSON.stringify(sounds));assert(sounds.filter(s=>s.kind==='beep').length>=5,'beeps missing');assert(sounds.filter(s=>s.kind==='shutter').every(s=>s.text==='Smile!'&&s.flash),'shutter/Smile/flash sync');report.checks.push({sounds});
- await results();await action('Download Photo');await waitFor(`document.querySelector('.preview-note').textContent.includes('Check your downloads')`,'free PNG');
- await action('Generate Live Moment');await waitFor(`document.body.innerText.includes('Complete development reward')`,'reward gate');await textButton('Simulate failure');assert(await evaluate(`!document.querySelector('.video-output-tabs')`),'failed reward unlocked');await textButton('Cancel');await action('Generate Live Moment');await reward();
- await waitFor(`!!document.querySelector('.live-strip-preview canvas')`,'Live Strip preview',30000);await delay(350);
- const synchronization=await evaluate(`qa.videos.filter(v=>v.src&&v.readyState>=2&&!v.paused).map(v=>({time:v.currentTime,muted:v.muted}))`);assert(synchronization.length===2&&synchronization.every(v=>v.muted),'mixed preview or muted state');const separation=synchronization[1].time-synchronization[0].time;assert(separation>3&&separation<3.6,'segments did not seek to their countdowns');await delay(2500);
- const syncedAgain=await evaluate(`qa.videos.filter(v=>v.src&&v.readyState>=2&&!v.paused).map(v=>v.currentTime)`);if(syncedAgain.length===2)assert(Math.abs(syncedAgain[1]-syncedAgain[0]-separation)<.2,'loop desync');
- const strip=await exportVideo('Live Strip');assert(strip.audio===0,'Live Strip mixed microphone tracks');assert(strip.height>strip.width,'strip aspect lost');assert(strip.pixel[0]>180&&strip.pixel[1]>160,'frame color lost');
- const full=await exportVideo('Full Live Moment');assert(full.audio===1,'full video lost audio');assert(full.width>full.height,'full video contains strip geometry');
- await layout(390,844);const screenshot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(out+'/full-video-mobile.png',Buffer.from(screenshot.data,'base64'));await close();
- await action('Generate GIF');await waitFor(`!!document.querySelector('.gif-preview')`,'GIF without another reward');await close();
- await action('Edit Again');await route('/customize');await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print');await click('.print-continuation a');await route('/results');
- await action('Share via QR');await waitFor(`document.body.innerText.includes('Create 10-minute QR share')`,'QR no second reward');
- assert(!networkRequests.some(r=>r.method==='POST'&&r.url===origin+'/api/shares'),'unsolicited upload');
- await fetch('http://127.0.0.1:9006/__test/reset');await textButton('Create 10-minute QR share');await waitFor(`!!document.querySelector('.share-qr')`,'QR created',30000);
- const url=await evaluate(`document.querySelector('.share-link').href`),id=url.split('/').at(-1),shareState=await(await fetch('http://127.0.0.1:9006/__test/stats')).json();
- const row=shareState.rows.find(r=>r.id===id);assert(Date.parse(row.expires_at)-Date.parse(row.created_at)===600000,'TTL not ten minutes');assert(shareState.objects===1,'extra media uploads');
- const publicPage=await fetch(url),html=await publicPage.text();assert(publicPage.ok&&html.includes('/api/shares/'+id+'/image')&&!html.includes('storage_path'),'public route');
- const imageResponse=await fetch(origin+'/api/shares/'+id+'/image');assert(imageResponse.status===200&&imageResponse.headers.get('cache-control').includes('no-store'),'private image response');
- await fetch('http://127.0.0.1:9006/__test/advance?ms=600001');const expired=await fetch(origin+'/api/shares/'+id+'/image');assert(expired.status===410,'server served expired photo');const expiredPage=await(await fetch(url)).text();assert(expiredPage.includes('expired or is unavailable'),'expired public page');
- await close();await action('Share via QR');await textButton('Create 10-minute QR share');await waitFor(`!!document.querySelector('.share-qr')`,'new QR');const nextUrl=await evaluate(`document.querySelector('.share-link').href`);assert(nextUrl!==url,'reactivated old QR');assert((await fetch(origin+'/api/shares/'+id+'/image')).status===410,'old QR revived');await close();
- await fetch('http://127.0.0.1:9006/__test/fail?on=1');await action('Share via QR');await textButton('Create 10-minute QR share');await waitFor(`document.body.innerText.includes('Temporary sharing is unavailable')`,'network failure');await close();await fetch('http://127.0.0.1:9006/__test/fail?on=0');
- const cleanup=await fetch(origin+'/api/shares/cleanup',{method:'POST',headers:{Authorization:'Bearer fixture-cleanup-secret'}});assert(cleanup.ok,'physical cleanup');
- await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','all generated media cleanup');assert(await evaluate(`qa.videos.every(v=>!v.src||v.paused)`),'video decoder still playing');
- console.log('M7 twelve-camera Live Strip');await start(12,1,'off',false);
- for(let i=0;i<12;i++){await click('.capture-actions button:last-child');await waitCount(i+1);await waitFor(`!document.querySelector('.capture-actions button:last-child').disabled||!!document.querySelector('a.choose-frame')`,'manual ready');}
- await results();await action('Generate Live Moment');await reward();await waitFor(`!!document.querySelector('.live-strip-preview canvas')`,'twelve motion slots',30000);
- const many=await exportVideo('Live Strip');assert(many.audio===0&&many.height<=1440,'twelve-slot video');await close();await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','twelve-slot cleanup');
- for(const [timer,sound,audio] of [[1,true,'off'],[5,true,'off'],[10,true,'off'],[1,false,'denied']]){
-   console.log('M7 timer',timer,'sound',sound,'audio',audio);await start(1,timer,audio,sound);await click('.capture-actions button:last-child');await waitCount(1);const events=await evaluate('qa.sounds');assert(events.filter(s=>s.kind==='beep').length===(sound?timer-1:0),'beep total '+JSON.stringify(events));assert(events.filter(s=>s.kind==='shutter').length===(sound?1:0),'shutter total');await assertFlash(1);
-   if(audio==='denied'||timer===1){await results();await action('Generate Live Moment');await reward();const silent=await exportVideo('Full Live Moment');assert(silent.audio===0,'mic-denied full video audio');await close();}
+ const idle=()=>waitFor(`!document.querySelector('.capture-actions button:last-child').disabled&&!document.querySelector('[aria-label="Pause capture"]')||!!document.querySelector('a.choose-frame')`,'capture settled',15000);
+ const checkTimeline=async(timer,count,{manual=false,flash=true}={})=>{
+   await idle();await delay(150);
+   const q=await evaluate(`({recorders:qa.recorders,stages:qa.stages,sounds:qa.sounds,shots:qa.shots,flashes:qa.flashes,urls:[...qa.urls.values()].filter(b=>b.type.startsWith('video/')).map(b=>({bytes:b.size,mime:b.type}))})`);
+   assert(q.recorders.length===1,'multiple capture recorders '+JSON.stringify(q.recorders));
+   assert(q.recorders[0].starts===1&&q.recorders[0].stops===1,'recorder restarted/stopped between photos');
+   assert(q.urls.length===1,'duplicate source blobs '+JSON.stringify(q.urls));
+   assert(q.shots.length===count,'missing stills');
+   const smiles=q.stages.filter(s=>s.text==='Smile!');assert(smiles.length===count,'Smile stages '+JSON.stringify(q.stages));
+   for(let i=0;i<count;i++){
+     const shutter=q.sounds.filter(s=>s.kind==='shutter')[i];assert(shutter.at-smiles[i].at>=940,'Smile was not a full second '+JSON.stringify({shutter,smile:smiles[i]}));
+     assert(q.shots[i].at>=shutter.at,'still before shutter');
+   }
+   assert(!q.stages.some(s=>s.text==='1'),'numeric one displayed');assert(q.sounds.filter(s=>s.kind==='beep').length===count*(timer-1),'wrong beep count');
+   assert(q.flashes.length===(flash?count:0),'flash count');
+   if(!manual){assert(q.recorders[0].pauses===1,'recorder paused between automatic cycles');const duration=q.recorders[0].end-q.recorders[0].at;assert(duration>=timer*count*1000&&duration<timer*count*1000+count*600+2000,'session duration '+duration);}
+   report.checks.push({timer,count,...q});console.log('PASS timeline',timer,count,'source bytes',q.urls[0].bytes);
+ };
+ const captureSession=async(timer,count,options={})=>{
+   await start(count,timer,options.audio??'off');if(options.filter)await click('[aria-label="'+options.filter+'"]');if(options.flash===false)await click('[aria-label="Screen flash"]');
+   if(timer===1){for(let i=0;i<count;i++){await click('.capture-actions button:last-child');await waitCount(i+1);await idle();}}
+   else {await click('.capture-actions button:last-child');await waitFor(`document.querySelector('.capture-counter strong')?.textContent==='${count}/${count}'`,'all photos',timer*count*1000+20000);}
+   await checkTimeline(timer,count,{manual:timer===1,flash:options.flash!==false});
+ };
+ console.log('M8 complete countdown / continuous source');
+ if(!process.env.M8_LONG_ONLY){
+ await captureSession(5,4,{audio:'on',filter:'Mono'});
+ await click('.choose-frame');await route('/customize');
+ for(let i=0;i<9;i++)await click('[aria-label="Next frame"]');
+ for(let i=1;i<=5;i++){
+   assert(await evaluate(`document.querySelector('.customize-preview svg image[href^="/frames/"]')?.getAttribute('href').endsWith(' ${i}.png')`),'custom frame missing '+i);
+   await layout(1440);await layout(390,844);await layout(844,390);await layout(1440);
+   const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(out+'/custom-frame-'+i+'.png',Buffer.from(shot.data,'base64'));
+   await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'frame print');
+   assert(await evaluate(`document.querySelector('.print-output image[href^="/frames/"]').getAttribute('href').endsWith(' ${i}.png')`),'Print lost asset');
+   await click('.print-continuation a');await route('/results');await action('Download Photo');await waitFor(`document.querySelector('.preview-note').textContent.includes('Check your downloads')`,'frame PNG');
+   const pngUrl=await evaluate(`[...qa.urls.entries()].find(([u,b])=>b.type==='image/png')[0]`);const pngBlob=await blobData(pngUrl);await writeFile(out+'/frame-'+i+'-export.png',Buffer.from(pngBlob.data,'base64'));
+   await action('Generate Live Moment');if(i===1)await reward();await waitFor(`!!document.querySelector('.live-strip-preview canvas')`,'frame live preview',30000);
+   await delay(500);await writeFile(out+'/frame-'+i+'-live.png',Buffer.from(await evaluate(`document.querySelector('.live-strip-preview canvas').toDataURL().split(',')[1]`),'base64'));
+   const frameVideo=await exportVideo('Live Strip');assert(frameVideo.audio===0,'frame live audio');assert(Math.abs(frameVideo.photoPixel[0]-frameVideo.photoPixel[1])<8&&Math.abs(frameVideo.photoPixel[1]-frameVideo.photoPixel[2])<8,'Mono filter missing from motion '+JSON.stringify(frameVideo.photoPixel));
+   await close();await action('Edit Again');await route('/customize');
+   if(i<5)await click('[aria-label="Next frame"]');
  }
- await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','final reset');
- assert(!networkRequests.some(r=>r.url.includes('/frames/')),'custom frames used');
- assert(networkRequests.filter(r=>r.method==='POST').every(r=>[origin+'/api/shares',origin+'/api/reward/development'].includes(r.url)),'unexpected media upload');
- // Expected failed QR request logs a 503; all other browser errors are failures.
- const unexpected=errors.filter(e=>!(e.url===origin+'/api/shares'&&e.text?.includes('503')));assert(unexpected.length===0,'browser errors '+JSON.stringify(unexpected));
- console.log(JSON.stringify({checks:report.checks,exports:report.exports,layouts:report.layouts.length,errors},null,2));
-}finally{await writeFile(out+'/report.json',JSON.stringify(report,null,2));browser.kill();for(const promise of pending.values())clearTimeout(promise.timer);}
+ await click('[aria-label="Add heart sticker"]');await click('.add-text');
+ await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print ready');await delay(2200);assert(await evaluate(`location.pathname==='/print'&&qa.print===0`),'Print auto navigation/dialog');await click('.print-continuation a');await route('/results');
+ await action('Download Photo');await waitFor(`document.querySelector('.preview-note').textContent.includes('Check your downloads')`,'PNG');
+ const png=await evaluate(`(async()=>{const b=[...qa.urls.values()].find(b=>b.type==='image/png');const im=await createImageBitmap(b);const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const x=c.getContext('2d');x.drawImage(im,0,0);const alpha=x.getImageData(0,0,1,1).data[3];return {w:im.width,h:im.height,alpha};})()`);assert(png.h/png.w>3&&png.alpha<20,'custom alpha/aspect '+JSON.stringify(png));report.checks.push({png});
+ await action('Generate Live Moment');await waitFor(`!!document.querySelector('.live-strip-preview canvas')`,'custom live preview',30000);await delay(500);
+ const playing=await evaluate(`qa.videos.filter(v=>v.src&&v.readyState>=2&&!v.paused).map(v=>v.currentTime)`);assert(playing.length===4,'four segments not playing '+JSON.stringify(playing));assert(playing[3]-playing[0]>14,'slots do not seek to separate countdowns '+JSON.stringify(playing));
+ const strip=await exportVideo('Live Strip');assert(strip.audio===0,'strip should be muted');
+ const full=await exportVideo('Full Live Moment');assert(full.audio===1,'full audio missing');await close();
+ await action('Edit Again');await route('/customize');await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print');await click('.print-continuation a');await route('/results');await action('Generate Live Moment');await waitFor(`!!document.querySelector('.video-output-tabs')`,'reward preserved');await close();
+ await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','resource cleanup');
+ }
+ for(const [timer,count] of (process.env.M8_LONG_ONLY?[[10,12]]:[[1,4],[3,8],[5,8],[5,10],[5,12],[10,12]]))await captureSession(timer,count);
+ await results();await action('Generate Live Moment');await reward();await waitFor(`!!document.querySelector('.live-strip-preview canvas')`,'12 long segments',30000);const large=await exportVideo('Live Strip');assert(large.audio===0,'12 strip audio');if(process.env.M8_LONG_ONLY){const long=await exportVideo('Full Live Moment');assert(long.audio===0,'silent long video');}await close();
+ await captureSession(1,1,{flash:false,audio:'denied'});await results();await action('Generate Live Moment');await reward();const silent=await exportVideo('Full Live Moment');assert(silent.audio===0,'denied mic blocked video');await close();
+ const unexpected=errors.filter(e=>!e.url?.includes('googlesyndication.com')&&!e.url?.includes('doubleclick.net'));assert(!unexpected.length,'browser errors '+JSON.stringify(unexpected));
+ console.log('M8 PASS',JSON.stringify({checks:report.checks.length,exports:report.exports,layouts:report.layouts.length}));
+}finally{await writeFile(out+(process.env.M8_LONG_ONLY?'/report-long.json':'/report.json'),JSON.stringify(report,null,2));browser.kill();for(const promise of pending.values())clearTimeout(promise.timer);}

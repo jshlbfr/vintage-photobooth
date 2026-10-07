@@ -16,22 +16,22 @@ export async function loadVideo(url:string,signal:AbortSignal){
   }catch(error){disposeVideo(video);throw error;}
 }
 export function disposeVideo(video:HTMLVideoElement){video.pause();video.removeAttribute('src');video.load();}
-export function drawMotion(ctx:CanvasRenderingContext2D,video:HTMLVideoElement,capture:Capture,slot:{x:number;y:number;width:number;height:number;radius?:number}){
+export function drawMotion(ctx:CanvasRenderingContext2D,video:HTMLVideoElement,capture:Capture,slot:{x:number;y:number;width:number;height:number;radius?:number},graded?:HTMLCanvasElement){
   if(!capture.motion||video.readyState<2)return;
-  const crop=motionCrop(video.videoWidth,video.videoHeight,capture.motion,slot.width,slot.height);
+  const crop=motionCrop(graded?.width??video.videoWidth,graded?.height??video.videoHeight,capture.motion,slot.width,slot.height);
   ctx.save();ctx.beginPath();ctx.roundRect(slot.x,slot.y,slot.width,slot.height,slot.radius??0);ctx.clip();
   ctx.translate(slot.x+(capture.motion.mirrored?slot.width:0),slot.y);if(capture.motion.mirrored)ctx.scale(-1,1);
-  ctx.drawImage(video,crop.x,crop.y,crop.width,crop.height,0,0,slot.width,slot.height);ctx.restore();
+  ctx.drawImage(graded??video,crop.x,crop.y,crop.width,crop.height,0,0,slot.width,slot.height);ctx.restore();
 }
-export async function seekStart(video:HTMLVideoElement,signal:AbortSignal){
-  video.pause();if(video.currentTime<.01)return;
-  video.currentTime=0;
+export async function seekStart(video:HTMLVideoElement,signal:AbortSignal,start=0){
+  video.pause();if(Math.abs(video.currentTime-start)<.01)return;
+  video.currentTime=start;
   const deadline=performance.now()+1500;
   while(video.seeking&&performance.now()<deadline)await wait(10,signal);
-  signal.throwIfAborted();
+  signal.throwIfAborted();if(video.seeking)throw new Error('This browser could not seek the recorded countdown. Your still photos are safe.');
 }
 export async function runCycle(entries:{video:HTMLVideoElement;source:MotionSource}[],signal:AbortSignal,draw:()=>void,progress?:(fraction:number)=>void){
-  await Promise.all(entries.map(e=>seekStart(e.video,signal)));
+  await Promise.all(entries.map(e=>seekStart(e.video,signal,(e.source.capture.motion?.startMs??0)/1000)));
   await Promise.all(entries.map(e=>e.video.play()));
   const duration=Math.max(...entries.map(e=>clipSeconds(e.source.capture)),1),started=performance.now();
   try{
@@ -40,9 +40,9 @@ export async function runCycle(entries:{video:HTMLVideoElement;source:MotionSour
       const elapsed=(performance.now()-started)/1000;
       for(const {video,source} of entries){
         // Shorter clips hold their last frame until the entire group restarts.
-        const end=clipSeconds(source.capture);
+        const end=clipSeconds(source.capture),start=(source.capture.motion?.startMs??0)/1000;
         if(elapsed>=end){video.pause();continue;}
-        if(!video.ended&&!video.seeking&&Math.abs(video.currentTime-elapsed)>.18)video.currentTime=Math.min(elapsed,end-.02);
+        if(!video.ended&&!video.seeking&&Math.abs(video.currentTime-start-elapsed)>.18)video.currentTime=start+Math.min(elapsed,end-.02);
       }
       draw();progress?.(Math.min(1,elapsed/duration));await wait(1000/24,signal);
     }

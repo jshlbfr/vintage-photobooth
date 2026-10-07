@@ -21,7 +21,7 @@ export type Capture = {
   id: string;
   source: "sample" | "camera" | "upload";
   still: MediaReference;
-  motion?: { media: MediaReference; durationMs: number; hasAudio: boolean; mirrored: boolean; crop: { x: number; y: number; width: number; height: number } };
+  motion?: { media: MediaReference; startMs?: number; sourceDurationMs?: number; durationMs: number; hasAudio: boolean; mirrored: boolean; crop: { x: number; y: number; width: number; height: number } };
   mirrorApplied?: boolean;
   capturedAt: number;
   filterAtCapture: FilterId;

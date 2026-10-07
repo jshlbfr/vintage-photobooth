@@ -1,3 +1,4 @@
+import { getFrameTemplate } from '../frame-templates';
 import { getCoverCrop, getStripLayout, type StripComposition } from '../composition';
 import { STICKER_ASSETS } from '../artwork';
 import { exportDimensions, orderedElements, stickerDimensions } from '../editor/geometry';
@@ -44,7 +45,14 @@ export async function renderStrip(composition:StripComposition,signal:AbortSigna
     const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Image rendering is unavailable in this browser.');
     ctx.scale(canvas.width/layout.width,canvas.height/layout.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
     ctx.beginPath();ctx.roundRect(0,0,layout.width,layout.height,layout.radius);ctx.clip();
-    if(options?.layer!=='decorations'){ctx.fillStyle=composition.frameColor;ctx.fillRect(0,0,layout.width,layout.height);}
+    const template=getFrameTemplate(composition.frameStyle);
+    const artwork=template.kind==='asset'?template.variants[composition.count]:undefined;
+    const drawArtwork=async()=>{if(artwork){const image=await loadImage(artwork.asset,signal);try{ctx.drawImage(image,0,0,layout.width,layout.height);}finally{image.src='';}}};
+    if(options?.layer!=='decorations'){
+      const b=layout.backing??{x:0,y:0,width:layout.width,height:layout.height,radius:layout.radius};
+      ctx.fillStyle=composition.frameColor;ctx.beginPath();ctx.roundRect(b.x,b.y,b.width,b.height,b.radius);ctx.fill();
+      if(artwork?.layer==='background')await drawArtwork();
+    }
     for(let i=0;options?.layer!=='decorations'&&i<layout.slots.length;i++){
       signal.throwIfAborted();const slot=layout.slots[i],photo=composition.photos[i];
       if(!photo?.src)throw new Error('A photograph is missing. Return to Capture and try again.');
@@ -66,6 +74,8 @@ export async function renderStrip(composition:StripComposition,signal:AbortSigna
         ctx.restore();onProgress?.(i+1,layout.slots.length);await pause();
       }finally{image.src='';work.width=0;work.height=0;}
     }
+    // The overlay belongs above motion too, so only the final/decorations layer draws it.
+    if(options?.layer!=='base'&&artwork?.layer==='overlay')await drawArtwork();
     for(const element of options?.layer==='base'?[]:orderedElements(composition)){
       signal.throwIfAborted();ctx.save();ctx.translate(element.x*layout.width,element.y*layout.height);ctx.rotate(element.rotation*Math.PI/180);
       if(element.type==='sticker'){

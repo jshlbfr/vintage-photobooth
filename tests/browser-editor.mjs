@@ -40,7 +40,7 @@ browser.stdio[4].on('data', chunk => {
     }
     if (message.method === 'Network.requestWillBeSent') networkRequests.push({url:message.params.request.url,method:message.params.request.method});
     if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
-    if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') errors.push(message.params.entry);
+    if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error' && !/googlesyndication\.com|doubleclick\.net/.test(message.params.entry.url??'')) errors.push(message.params.entry);
   }
 });
 function send(method, params = {}, sessionId) {
@@ -64,6 +64,7 @@ try {
  const click=async selector=>{await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);await delay(60);};
  const choose=async(label,value)=>{await evaluate(`[...document.querySelectorAll('[aria-label="${label}"] button')].find(b=>b.textContent===${JSON.stringify(value)}).click()`);await delay(60);};
  await cdp('Page.enable');await cdp('Runtime.enable');await cdp('Log.enable');await cdp('Network.enable');
+ await cdp('Network.setBlockedURLs',{urls:['*googlesyndication.com*','*doubleclick.net*']});
  await cdp('Page.addScriptToEvaluateOnNewDocument',{source:`
  window.qa={calls:[],tracks:[],urls:new Map(),revoked:[],flashes:[],shots:[],ticks:[],denyAudio:false,print:0};window.print=()=>qa.print++;
  const gum=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -106,6 +107,7 @@ try {
    await center('.capture-strip');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
  };
  const assertFlash=async expected=>{
+   await waitFor(`!document.querySelector('.screen-flash')`,'flash finished');
    await delay(200);const q=await evaluate(`({flashes:qa.flashes,shots:qa.shots,ticks:qa.ticks})`);
    assert(q.shots.length===expected&&q.flashes.length===expected,'flash/shot mismatch '+JSON.stringify(q));
    for(const f of q.flashes)assert(f.color==='rgb(255, 255, 255)'&&f.opacity==='1'&&f.position==='fixed'&&f.z==='2147483647'&&f.parent==='BODY'&&f.x===0&&f.y===0&&f.w===f.vw&&f.h===f.vh&&f.duration>=350&&f.duration<550&&f.pointer==='none','flash style/timing '+JSON.stringify(f));
@@ -165,7 +167,7 @@ try {
  }
  await start(4,3);await click('.capture-actions button:last-child');await waitFor(`!!document.querySelector('.screen-flash')`,'flash begins');await click('[aria-label="Pause capture"]');await waitCount(1);await waitFor(`document.querySelector('.capture-actions button:last-child').textContent==='Resume'`,'finish then pause');await delay(1000);assert(await progress()===1,'pause ghost shutter');await click('.capture-actions button:last-child');await waitCount(4);await assertFlash(4);
  await start(1,1);await click('[aria-label="Screen flash"]');await click('.capture-actions button:last-child');await waitCount(1);assert(await evaluate('qa.flashes.length===0'),'disabled flash');
- assert(networkRequests.every(r=>r.method==='GET'&&(r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:'))),'media upload or external request');
+ assert(networkRequests.filter(r=>!/googlesyndication\.com|doubleclick\.net/.test(r.url)).every(r=>r.method==='GET'&&(r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:'))),'media upload or external request');
  assert(!networkRequests.some(r=>r.url.includes('/frames/')),'custom frames used');assert(errors.length===0,'browser errors');
  console.log(JSON.stringify({counts:report.counts,exports:report.exports,layouts:report.layouts.length,errors},null,2));
 } finally {await writeFile(out+'/m5-report.json',JSON.stringify(report,null,2));browser.kill();for(const promise of pending.values())clearTimeout(promise.timer);}

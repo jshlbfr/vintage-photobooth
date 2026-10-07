@@ -15,7 +15,7 @@ export async function runCountdown(seconds: number, signal: AbortSignal, tick: (
     signal.throwIfAborted();
     const remaining = Math.ceil((deadline - performance.now()) / 1000);
     if (remaining !== previous) { tick(remaining); previous = remaining; }
-    await wait(Math.min(100, Math.max(1, deadline - performance.now())), signal);
+    await wait(Math.min(100, Math.max(1, deadline - (remaining - 1) * 1000 - performance.now())), signal);
   }
   signal.throwIfAborted(); tick(0);
 }

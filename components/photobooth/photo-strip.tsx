@@ -17,7 +17,7 @@ export function PhotoStrip({ composition, empty = false, className = "", label =
   const artwork = template.kind === "asset" ? template.variants[composition.count] : undefined;
   const frameImage = artwork && <image href={artwork.asset} width={layout.width} height={layout.height} />;
   return <svg ref={svgRef} onPointerDown={onPointerDown} className={`photo-strip strip-preview ${editorLayer?'is-editable':''} ${className}`} data-columns={new Set(layout.slots.map(slot => slot.x)).size} viewBox={`0 0 ${layout.width} ${layout.height}`} role={editorLayer ? "group" : "img"} aria-label={`${label}, ${composition.count} photos`}>
-    <rect width={layout.width} height={layout.height} rx={layout.radius} fill={composition.frameColor} />
+    <rect {...(layout.backing ?? {width:layout.width,height:layout.height})} rx={layout.backing?.radius ?? layout.radius} fill={composition.frameColor} />
     {artwork?.layer === "background" && frameImage}
     {layout.slots.map((slot, index) => <g key={index}>
       <defs><clipPath id={`${id}-slot-${index}`}><rect {...slot} rx={slot.radius} /></clipPath></defs>

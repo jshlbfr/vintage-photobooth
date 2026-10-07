@@ -40,7 +40,7 @@ browser.stdio[4].on('data', chunk => {
     }
     if (message.method === 'Network.requestWillBeSent') networkRequests.push({url:message.params.request.url,method:message.params.request.method});
     if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
-    if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') errors.push(message.params.entry);
+    if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error' && !/googlesyndication\.com|doubleclick\.net/.test(message.params.entry.url??'')) errors.push(message.params.entry);
   }
 });
 function send(method, params = {}, sessionId) {
@@ -64,6 +64,7 @@ try {
  const click=async selector=>{await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);await delay(60);};
  const choose=async(label,value)=>{await evaluate(`[...document.querySelectorAll('[aria-label="${label}"] button')].find(b=>b.textContent===${JSON.stringify(value)}).click()`);await delay(60);};
  await cdp('Page.enable');await cdp('Runtime.enable');await cdp('Log.enable');await cdp('Network.enable');
+ await cdp('Network.setBlockedURLs',{urls:['*googlesyndication.com*','*doubleclick.net*']});
  await cdp('Page.addScriptToEvaluateOnNewDocument',{source:`
  window.qa={calls:[],tracks:[],urls:new Map(),revoked:[],flashes:[],shots:[],ticks:[],denyAudio:false,print:0};window.print=()=>qa.print++;
  const gum=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -106,6 +107,7 @@ try {
    await center('.capture-strip');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
  };
  const assertFlash=async expected=>{
+   await waitFor(`!document.querySelector('.screen-flash')`,'flash finished');
    await delay(200);const q=await evaluate(`({flashes:qa.flashes,shots:qa.shots,ticks:qa.ticks})`);
    assert(q.shots.length===expected&&q.flashes.length===expected,'flash/shot mismatch '+JSON.stringify(q));
    for(const f of q.flashes)assert(f.color==='rgb(255, 255, 255)'&&f.opacity==='1'&&f.position==='fixed'&&f.z==='2147483647'&&f.parent==='BODY'&&f.x===0&&f.y===0&&f.w===f.vw&&f.h===f.vh&&f.duration>=350&&f.duration<550&&f.pointer==='none','flash style/timing '+JSON.stringify(f));
@@ -132,7 +134,7 @@ try {
    assert(new Set(composition.slots.map(s=>s.x)).size===(count>=6?2:1),'wrong columns');
    if(count===8){await waitFor(`document.querySelectorAll('.capture-strip image').length===8`,'processed images');assert(await evaluate(`JSON.stringify([...document.querySelectorAll('.capture-strip image')].map(n=>n.dataset.filter))===JSON.stringify(['golden-hour','golden-hour','golden-hour','mono','mono','mono','mono','mono'])`),'per-capture filter lost');}
    await click('.choose-frame');await route('/customize');assert(await evaluate(`qa.tracks.every(t=>t.readyState==='ended')`),'hardware remained on');
-   for(let f=0;f<9;f++){await center('.customize-preview');await click('[aria-label="Next frame"]');}
+   for(let f=0;f<9;f++){await center('.customize-preview');await click('[aria-label="Next frame"]');}if(count===4)for(let f=0;f<5;f++)await click('[aria-label="Next frame"]');
    await click('[aria-label="Vanilla"]');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
    await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print');await delay(400);assert(await evaluate(`location.pathname==='/print'`),'print auto navigated');
    assert(await evaluate(`document.querySelector('.print-output svg').getAttribute('viewBox')===${JSON.stringify(composition.box)}`),'print geometry changed');
@@ -140,7 +142,7 @@ try {
    await click('.print-continuation a');await route('/results');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
    assert(await evaluate(`document.querySelector('.results-strip svg').getAttribute('viewBox')===${JSON.stringify(composition.box)}`),'results geometry changed');
    const calls=await evaluate('qa.calls.length');await click('a[href="/customize"].result-action');await route('/customize');assert(await evaluate(`qa.calls.length===${calls}`),'Edit Again permission');
-   const privacy=await evaluate(`({print:qa.print,frames:performance.getEntriesByType('resource').some(e=>e.name.includes('/frames/'))})`);assert(!privacy.print&&!privacy.frames,'unexpected print/custom frame');
+   const privacy=await evaluate(`({print:qa.print,frames:performance.getEntriesByType('resource').some(e=>e.name.includes('/frames/'))})`);assert(!privacy.print&&(count===4||!privacy.frames),'unexpected print/incompatible custom frame');
    report.counts.push(count);
  }
  console.log('M4 manual/filter/timer checks');
@@ -159,7 +161,7 @@ try {
  await click('.setup-continue');await route('/capture');await click('.capture-actions button:last-child');await waitCount(1);await assertFlash(1);
  await click('.choose-frame');await route('/customize');await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print');await click('.print-continuation a');await route('/results');await click('a[href="/camera"].result-action');await route('/camera');
  await waitFor('qa.urls.size===0','Take Another URLs');assert(await evaluate(`qa.tracks.every(t=>t.readyState==='ended')`),'Take Another hardware');
- assert(networkRequests.every(r=>r.method==='GET'&&(r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:'))),'unexpected outbound request');
- report.checks=['all counts shared across four stages','1s manual','3/5/10 continuous','pause during countdown','pause after 3/resume with filter change','Original pixel pipeline','manual per-photo filters','flash disabled','flash enabled with reduced motion','audio denial without repeat prompt','URL/track cleanup','desktop and mobile layouts','Print explicit continuation','no media uploads/custom frames'];
+ assert(networkRequests.filter(r=>!/googlesyndication\.com|doubleclick\.net/.test(r.url)).every(r=>r.method==='GET'&&(r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:'))),'unexpected outbound request');
+ report.checks=['all counts shared across four stages','1s manual','3/5/10 continuous','pause during countdown','pause after 3/resume with filter change','Original pixel pipeline','manual per-photo filters','flash disabled','flash enabled with reduced motion','audio denial without repeat prompt','URL/track cleanup','desktop and mobile layouts','Print explicit continuation','no media uploads/incompatible custom frames'];
  console.log(JSON.stringify({counts:report.counts,flashCases:report.flashes.map(f=>f.flashes.length),layouts:report.layouts.length,errors},null,2));if(errors.length)process.exitCode=1;
 } finally {await writeFile(out+'/m4-report.json',JSON.stringify(report,null,2));browser.kill();for(const promise of pending.values())clearTimeout(promise.timer);}

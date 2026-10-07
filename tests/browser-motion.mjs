@@ -44,7 +44,7 @@ browser.stdio[4].on('data', chunk => {
     }
     if (message.method === 'Network.requestWillBeSent') networkRequests.push({url:message.params.request.url,method:message.params.request.method});
     if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
-    if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') errors.push(message.params.entry);
+    if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error' && !/googlesyndication\.com|doubleclick\.net/.test(message.params.entry.url??'')) errors.push(message.params.entry);
   }
 });
 function send(method, params = {}, sessionId) {
@@ -68,6 +68,7 @@ try {
  const click=async selector=>{await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);await delay(60);};
  const choose=async(label,value)=>{await evaluate(`[...document.querySelectorAll('[aria-label="${label}"] button')].find(b=>b.textContent===${JSON.stringify(value)}).click()`);await delay(60);};
  await cdp('Page.enable');await cdp('Runtime.enable');await cdp('Log.enable');await cdp('Network.enable');
+ await cdp('Network.setBlockedURLs',{urls:['*googlesyndication.com*','*doubleclick.net*']});
  await cdp('Page.addScriptToEvaluateOnNewDocument',{source:`
  window.qa={beats:0,calls:[],tracks:[],urls:new Map(),revoked:[],flashes:[],shots:[],ticks:[],denyAudio:false,print:0};window.print=()=>qa.print++;setInterval(()=>qa.beats++,16);
  const gum=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -163,7 +164,7 @@ try {
    await action('Generate Live Moment');await evaluate(`[...document.querySelectorAll('button')].find(b=>b.textContent==='Full Live Moment').click()`);await waitFor(`!!document.querySelector('.media-empty')&&!document.querySelector('.live-moment-video')`,'upload-only motion fallback');await close();
    await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','GIF reset cleanup');report.counts.push(count);
  }
- assert(networkRequests.every(r=>(r.method==='GET'&&(r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:')))||(r.method==='POST'&&r.url===origin+'/api/reward/development')),'media upload or external request');
+ assert(networkRequests.filter(r=>!/googlesyndication\.com|doubleclick\.net/.test(r.url)).every(r=>(r.method==='GET'&&(r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:')))||(r.method==='POST'&&r.url===origin+'/api/reward/development')),'media upload or external request');
  assert(!networkRequests.some(r=>r.url.includes('/frames/')),'custom frames used');assert(errors.length===0,'browser errors '+JSON.stringify(errors));
  console.log(JSON.stringify({exports:report.exports,checks:report.checks,layouts:report.layouts.length,errors},null,2));
 } finally {await writeFile(out+'/report.json',JSON.stringify(report,null,2));browser.kill();for(const promise of pending.values())clearTimeout(promise.timer);}

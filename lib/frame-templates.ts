@@ -9,6 +9,7 @@ export type FrameLayout = {
   radius: number;
   slots: readonly PhotoSlot[];
   captionY?: number;
+  backing?: PhotoSlot;
 };
 type GeneratedFrameTemplate = {
   kind: "generated";
@@ -33,6 +34,7 @@ export type AssetFrameTemplate = {
   kind: "asset";
   id: string;
   name: string;
+  description?: string;
   variants: Partial<Record<PhotoCount, {
     asset: string;
     layout: FrameLayout;
@@ -58,9 +60,24 @@ export const FRAME_STYLES = [
   { ...base, id: "wide", name: "Wide", description: "A wider print with landscape photo windows.", width: 260, sidePadding: 12, photoGap: 14, fourPhotoRatio: .72, photoRadius: 5, frameRadius: 6 },
   { ...base, id: "narrow", name: "Narrow", description: "Slim proportions with crisp, close-set windows.", width: 190, sidePadding: 12, photoGap: 12, fourPhotoRatio: .94, photoRadius: 0, frameRadius: 2 },
 ] as const satisfies readonly GeneratedFrameTemplate[];
-export type FrameStyle = (typeof FRAME_STYLES)[number]["id"];
-
-export const FRAME_TEMPLATES: readonly FrameTemplate[] = FRAME_STYLES;
+// Coordinates measured in the unmodified 302 × 958 PNGs. Photo rectangles extend
+// just under the window rims; the original alpha artwork supplies their worn edges.
+const custom = (id: string, name: string, file: number, slots: readonly PhotoSlot[], backing: PhotoSlot): AssetFrameTemplate => ({
+  kind: "asset", id, name, description: "Original vintage artwork · four photos only.",
+  variants: { 4: { asset: `/frames/Vintage Frame 4-Image Strip ${file}.png`, layer: "overlay",
+    layout: { width: 302, height: 958, radius: 0, slots, backing } } },
+});
+const slot = (x: number, y: number, width: number, height: number, radius = 10): PhotoSlot => ({x,y,width,height,radius});
+export const CUSTOM_FRAMES = [
+  custom("vintage-1", "Vintage Burgundy", 1, [slot(49,82,205,173),slot(49,276,206,180),slot(50,478,205,181),slot(49,681,205,180)], slot(24,34,252,894,18)),
+  custom("vintage-2", "Vintage Cream", 2, [slot(39,65,213,181),slot(39,270,213,185),slot(39,478,213,186),slot(39,687,213,183)], slot(19,34,251,894,15)),
+  custom("vintage-3", "Vintage Tape", 3, [slot(57,91,196,166),slot(56,281,197,176),slot(56,481,198,182),slot(58,686,195,175)], slot(33,36,239,892,15)),
+  custom("vintage-4", "Vintage Film", 4, [slot(63,84,196,174),slot(63,282,196,179),slot(63,484,196,180),slot(63,687,196,180)], slot(22,38,259,892,16)),
+  custom("vintage-5", "Vintage Paper", 5, [slot(50,64,202,181),slot(50,264,202,188),slot(50,470,202,186),slot(50,675,202,186)], slot(29,29,240,891,13)),
+] as const;
+export type FrameStyle = (typeof FRAME_STYLES)[number]["id"] | `vintage-${1|2|3|4|5}`;
+export const FRAME_TEMPLATES: readonly FrameTemplate[] = [...FRAME_STYLES, ...CUSTOM_FRAMES];
+export function framesForCount(count: PhotoCount) { return FRAME_TEMPLATES.filter(frame => supportsPhotoCount(frame,count)); }
 
 export function getFrameTemplate(id: string): FrameTemplate {
   const template = FRAME_TEMPLATES.find((entry) => entry.id === id);

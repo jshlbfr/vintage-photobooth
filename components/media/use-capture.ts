@@ -25,24 +25,42 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
   const sound=useRef<CaptureSound|null>(null);
   useEffect(()=>()=>{sound.current?.dispose();sound.current=null;},[session.id]);
   const recorder=useRef<ReturnType<typeof beginMotion>>(null);
+  type Segment = { id: string; still: MediaReference; startMs: number; durationMs: number; mirrored: boolean; crop: NonNullable<Capture['motion']>['crop'] };
+  const segments=useRef<Segment[]>([]);
+  const recordingGeneration=useRef(0);
+  const recordingSize=useRef({width:0,height:0});
+  const flashTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const clearFlash=useCallback(()=>{if(flashTimer.current)clearTimeout(flashTimer.current);flashTimer.current=null;if(mounted.current)setFlash(false);},[]);
   const transition=(next:Phase)=>{phaseRef.current=next;if(mounted.current)setPhase(next);};
-  const cancel=useCallback(()=>{
-    sound.current?.stop();operation.current?.abort();recorder.current?.cancel();recorder.current=null;
+  const finishRecording=useCallback(async()=>{
+    const active=recorder.current, moments=segments.current, dimensions=recordingSize.current, generation=recordingGeneration.current;
+    recorder.current=null;segments.current=[];
+    if(!active)return false;
+    const clip=await active.finish();
+    // Reset/session replacement may have released all of these stills while encoding.
+    const retained=moments.filter(moment=>store.resolve(moment.still));
+    if(!clip||!retained.length||generation!==recordingGeneration.current)return false;
+    const media=store.add(clip.blob,dimensions.width,dimensions.height);
+    dispatch({type:'captures/motion',sessionId:session.id,moments:retained.map(({id,startMs,durationMs,mirrored,crop})=>({id,motion:{media,startMs,durationMs,sourceDurationMs:clip.durationMs,hasAudio:clip.hasAudio,mirrored,crop}}))});
+    return true;
+  },[dispatch,session.id,store]);
+  const cancelCountdown=useCallback(()=>{
+    sound.current?.stop();operation.current?.abort();recorder.current?.pause();
   },[]);
   useEffect(()=>{
     mounted.current=true;
-    const hidden=()=>{if(document.hidden){pauseRequested.current=true;cancel();}};
+    const hidden=()=>{if(document.hidden){pauseRequested.current=true;cancelCountdown();clearFlash();}};
     document.addEventListener('visibilitychange',hidden);
-    return()=>{mounted.current=false;document.removeEventListener('visibilitychange',hidden);cancel();};
-  },[cancel,session.id]);
+    return()=>{mounted.current=false;document.removeEventListener('visibilitychange',hidden);cancelCountdown();clearFlash();void finishRecording();};
+  },[cancelCountdown,clearFlash,finishRecording]);
   const stream=camera.getVideoStream();
-  useEffect(()=>()=>cancel(),[stream,cancel]);
+  useEffect(()=>()=>{cancelCountdown();void finishRecording();},[stream,cancelCountdown,finishRecording]);
   const complete=session.captures.length>=session.preferences.photoCount;
   const busy=phase==='counting'||phase==='capturing'||phase==='uploading';
   const continuous=session.preferences.timerSeconds!==1;
   const pause=()=>{
     pauseRequested.current=true;
-    if(phaseRef.current==='counting')cancel();
+    if(phaseRef.current==='counting')cancelCountdown();
     setMessage('Paused. Resume when you’re ready.');
   };
   const capture=async()=>{
@@ -53,69 +71,73 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
     let count=session.captures.length;
     const allocated:MediaReference[]=[];
     try {
+      if(!recorder.current){
+        const source=camera.getRecordingStream();recorder.current=source?beginMotion(source):null;
+        recordingSize.current={width:element.videoWidth,height:element.videoHeight};
+      }
+      recorder.current?.resume();
       do {
         transition('counting');
-        await runCountdown(session.preferences.timerSeconds-1,controller.signal,remaining=>{
-          const shown=remaining+1;
-          if(shown>1){flushSync(()=>setCountdown(shown));if(session.preferences.captureSound)sound.current?.beep();}
-          if(shown<=2&&!recorder.current){const stream=camera.getRecordingStream();recorder.current=stream?beginMotion(stream):null;}
+        const startMs=recorder.current?.currentTimeMs()??0;
+        await runCountdown(session.preferences.timerSeconds,controller.signal,remaining=>{
+          if(remaining>0){flushSync(()=>setCountdown(remaining));if(remaining>1&&session.preferences.captureSound)sound.current?.beep();}
         });
         controller.signal.throwIfAborted();
         if(element.readyState<2||!element.videoWidth)throw new Error('The camera is warming up. Try again in a moment.');
         transition('capturing');
-        flushSync(()=>{setCountdown(1);if(session.preferences.flash)setFlash(true);});
-        if(session.preferences.captureSound)sound.current?.shutter();
         const flashStarted=performance.now();
         if(session.preferences.flash){
+          flushSync(()=>setFlash(true));
+          flashTimer.current=setTimeout(()=>{flashTimer.current=null;if(mounted.current)setFlash(false);},400);
+        }
+        if(session.preferences.captureSound)sound.current?.shutter();
+        if(session.preferences.flash){
           await afterPaint(controller.signal);
-          // Give the illuminated camera scene time to reach the incoming video.
           await wait(Math.max(0,120-(performance.now()-flashStarted)),controller.signal);
         }
         controller.signal.throwIfAborted();
         const timestamp=Date.now();
-        // Read the raw video, never the HTML flash or the filtered preview canvas.
-        const [still]=await Promise.all([
-          captureStill(element,session.preferences.mirrored),
-          session.preferences.flash ? wait(Math.max(0,400-(performance.now()-flashStarted)),controller.signal) : Promise.resolve(),
-        ]);
-        if(session.preferences.flash)setFlash(false);
+        // Read the raw camera frame independently from the HTML illumination overlay.
+        const stillPromise=captureStill(element,session.preferences.mirrored);
+        const endMs=recorder.current?.currentTimeMs()??startMs;
+        // Freeze only after a manual/final shutter, never between automatic cycles.
+        if(!continuous||count+1===session.preferences.photoCount||pauseRequested.current)recorder.current?.pause();
+        const still=await stillPromise;
         controller.signal.throwIfAborted();
-        let motion:Capture['motion'];
-        const activeRecorder=recorder.current;
-        if(activeRecorder){
-          await wait(700,controller.signal);
-          const clip=await activeRecorder.finish();controller.signal.throwIfAborted();
-          if(clip){const media=store.add(clip.blob,element.videoWidth,element.videoHeight);allocated.push(media);motion={media,durationMs:clip.durationMs,hasAudio:clip.hasAudio,mirrored:session.preferences.mirrored,crop:still.crop};}
-        }
-        recorder.current=null;
         const reference=store.add(still.blob,still.width,still.height);allocated.push(reference);
-        dispatch({type:'captures/add',sessionId:session.id,capture:{id:crypto.randomUUID(),source:'camera',still:reference,capturedAt:timestamp,filterAtCapture:session.customization.filterId,mirrorApplied:session.preferences.mirrored,...(motion?{motion}:{})}});
+        const id=crypto.randomUUID();
+        if(recorder.current?.available)segments.current.push({id,still:reference,startMs,durationMs:endMs-startMs,mirrored:session.preferences.mirrored,crop:still.crop});
+        dispatch({type:'captures/add',sessionId:session.id,capture:{id,source:'camera',still:reference,capturedAt:timestamp,filterAtCapture:session.customization.filterId,mirrorApplied:session.preferences.mirrored}});
         allocated.length=0;count++;
-        setMessage(count===session.preferences.photoCount?'All photos are ready. Choose your frame.':pauseRequested.current?'Paused. Resume when you’re ready.':motion?`Photo saved · motion ${motion.hasAudio?'with audio':'without audio'}.`:'Photo saved. Motion recording is unavailable in this browser.');
+        setMessage(count===session.preferences.photoCount?'All photos are ready. Choose your frame.':pauseRequested.current?'Paused. Resume when you’re ready.':recorder.current?.available?'Photo saved · the full countdown is recorded.':'Photo saved. Motion recording is unavailable in this browser.');
       } while(continuous&&count<session.preferences.photoCount&&!pauseRequested.current&&!controller.signal.aborted);
+      if(count>=session.preferences.photoCount&&!await finishRecording())setMessage('Your photos are ready. Motion recording was unavailable; your still photos are safe.');
+      // Keep the established 400 ms flash visible after the last/manual shutter.
+      if(flashTimer.current)await wait(300,controller.signal);
     } catch(error){
       if(!controller.signal.aborted)setMessage(error instanceof Error?error.message:'Capture failed. Please try again.');
     } finally {
       for(const reference of allocated)if(reference.kind==='local')store.release(reference.resourceId);
-      recorder.current?.cancel();recorder.current=null;
+      recorder.current?.pause();
       operation.current=null;
-      if(mounted.current){setCountdown(null);setFlash(false);transition(count>=session.preferences.photoCount?'complete':pauseRequested.current?'paused':'idle');}
+      if(mounted.current){setCountdown(null);transition(controller.signal.aborted?'paused':count>=session.preferences.photoCount?'complete':pauseRequested.current?'paused':'idle');}
     }
   };
   const upload=async(files:File[]|null)=>{
     if(!files?.length||operation.current||complete)return;
     const controller=new AbortController();operation.current=controller;transition('uploading');setMessage('');
-    const capacity=session.preferences.photoCount-session.captures.length,selected=files.slice(0,capacity),errors:string[]=[];
+    const capacity=session.preferences.photoCount-session.captures.length,selected=files.slice(0,capacity),errors:string[]=[];let added=0;
     try {
       for(const file of selected){
         try{const image=await decodeUpload(file,controller.signal);controller.signal.throwIfAborted();
           const still=store.add(image.blob,image.width,image.height);
-          dispatch({type:'captures/add',sessionId:session.id,capture:{id:crypto.randomUUID(),source:'upload',still,capturedAt:Date.now(),filterAtCapture:session.customization.filterId}});
+          dispatch({type:'captures/add',sessionId:session.id,capture:{id:crypto.randomUUID(),source:'upload',still,capturedAt:Date.now(),filterAtCapture:session.customization.filterId}});added++;
         }catch(error){if(controller.signal.aborted)break;errors.push(error instanceof Error?error.message:'The image could not be opened.');}
       }
+      if(added===capacity)await finishRecording();
       if(!controller.signal.aborted)setMessage(errors[0]??(files.length>capacity?`Added ${capacity} photos. Extra images were skipped.`:'Photos added from your device.'));
     }finally{operation.current=null;if(mounted.current)transition('idle');}
   };
-  const restart=()=>{pauseRequested.current=false;cancel();setCountdown(null);setFlash(false);setMessage('');transition('idle');dispatch({type:'captures/restart'});};
+  const restart=()=>{pauseRequested.current=false;recordingGeneration.current++;cancelCountdown();recorder.current?.cancel();recorder.current=null;segments.current=[];clearFlash();setCountdown(null);setMessage('');transition('idle');dispatch({type:'captures/restart'});};
   return {capture,upload,restart,pause,phase,busy,continuous,countdown,flash,message,complete};
 }

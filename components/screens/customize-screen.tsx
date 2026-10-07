@@ -12,7 +12,9 @@ import type { Customization } from '@/lib/session/types';
 import { FramePicker } from "@/components/photobooth/frame-picker";
 import { usePhotoBoothSession } from "@/components/session/session-provider";
 import { useStripComposition } from "@/components/media/media-provider";
-import { FRAME_COLORS, FRAME_STYLES, STICKERS } from "@/lib/design-data";
+import { FRAME_COLORS, STICKERS } from "@/lib/design-data";
+
+import { framesForCount, type FrameStyle } from "@/lib/frame-templates";
 
 export function CustomizeScreen() {
   const { session, dispatch } = usePhotoBoothSession();
@@ -30,7 +32,8 @@ export function CustomizeScreen() {
   const undo=()=>{const previous=past.at(-1);if(previous){setPast(p=>p.slice(0,-1));setFuture(f=>[customization,...f]);dispatch({type:'customization/replace',customization:previous});setSelectedId(null);}};
   const redo=()=>{const next=future[0];if(next){setPast(p=>[...p,customization]);setFuture(f=>f.slice(1));dispatch({type:'customization/replace',customization:next});setSelectedId(null);}};
   const color = session.customization.frameColor;
-  const frame = FRAME_STYLES.findIndex(entry => entry.id === session.customization.frameId);
+  const frames = framesForCount(session.preferences.photoCount);
+  const frame = frames.findIndex(entry => entry.id === session.customization.frameId);
   const composition = useStripComposition();
 
   return <div className="customize-workspace" onKeyDown={e=>{
@@ -40,7 +43,7 @@ export function CustomizeScreen() {
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();if(e.shiftKey)redo();else undo();}
   }} onPointerDown={e=>{if(!(e.target as HTMLElement).closest('.customize-preview,.editor-inspector,.sticker-palette,.add-text,.editor-history'))setSelectedId(null);}}><Panel className={`workspace-panel customize-panel ${selected?'is-editing':''}`} labelledBy="customize-title">
     <header className="panel-heading customize-heading"><BackLink href="/capture" label="Back to capture preview" /><h1 id="customize-title">Customize Your Photo</h1><p>Choose a frame. Change Color. Add stickers. Add text.</p><div className="editor-history"><button type="button" onClick={undo} disabled={!past.length}>Undo</button><button type="button" onClick={redo} disabled={!future.length}>Redo</button></div></header>
-    <FramePicker composition={composition} frameIndex={frame} onChange={(index) => commit({...customization,frameId:FRAME_STYLES[index].id})} />
+    <FramePicker composition={composition} frameIndex={frame} onChange={(index) => commit({...customization,frameId:frames[index].id as FrameStyle})} />
     <div className="customize-tools">
       <fieldset className="color-fieldset"><legend>Frame Color</legend><div className="color-palette">{FRAME_COLORS.map((swatch) => <button key={swatch.name} type="button" className="color-swatch" style={{ backgroundColor: swatch.value }} aria-label={swatch.name} title={swatch.name} aria-pressed={color === swatch.value} onClick={() => commit({...customization,frameColor:swatch.value})}>{color === swatch.value && <span className="swatch-check"><Icon name="check" /></span>}</button>)}</div></fieldset>
       <fieldset className="sticker-fieldset"><legend>Stickers</legend><div className="sticker-palette">{STICKERS.map((kind) => <button type="button" key={kind} aria-label={`Add ${kind.replaceAll("-", " ")} sticker`} onClick={()=>{const id=crypto.randomUUID();commit({...customization,stickers:[...customization.stickers,{id,assetId:kind,...newPlacement(customization),size:.28}]});setSelectedId(id);}}><Sticker kind={kind} /></button>)}</div></fieldset>

@@ -1,12 +1,14 @@
 # Vintage Photobooth
 
-Milestone 7 adds optional countdown/shutter sound, two distinct video outputs
-(Live Strip and Full Live Moment), one session reward unlock, and temporary
-10-minute QR sharing. PNG, GIF, video and audio processing remain local; only
-an explicitly requested final PNG share is uploaded.
-See [the Milestone 7 report](docs/milestone-7.md) and
-[Supabase setup instructions](docs/sharing-setup.md). No live backend or real
-advertising provider is configured by default.
+Milestone 8 adds the five original custom frames, a full final-second Smile stage,
+and one continuous capture recording with per-photo countdown segments.
+Live Strip uses the final composition and saved photo filters; Full Live Moment
+preserves the uninterrupted camera session and optional microphone audio.
+PNG, GIF, video and audio processing remain local. Only an explicitly requested
+final PNG share is uploaded, with server-enforced ten-minute access.
+See [the Milestone 8 report](docs/milestone-8.md) and
+[Supabase setup instructions](docs/sharing-setup.md). The real rewarded-ad provider
+remains unavailable pending production configuration and approval.
 Earlier reports cover [Milestone 4](docs/milestone-4.md) and
 [capture/layout refinements](docs/capture-refinements.md).
 Reference screenshots are never rendered as the interface.
@@ -48,8 +50,10 @@ have separate sessions.
 
 Camera access requires HTTPS or localhost. Microphone access is separately
 opt-in; denial leaves stills and silent motion working. MediaRecorder support
-varies by browser; stills work when recording is unavailable. Clips record only
-the short shutter window. All camera/microphone tracks stop on leaving Setup/
+varies by browser; stills work when recording is unavailable. Recording begins
+with the first countdown and continues through automatic capture cycles. Every
+photo references its full countdown range in that one local video. Explicit
+pauses and manual waiting use recorder pause/resume; resumed countdowns restart. All camera/microphone tracks stop on leaving Setup/
 Capture; media remains local and is released when removed or the session resets.
 
 Capture Sound defaults on and is independent of microphone recording. It uses
@@ -61,8 +65,10 @@ GIF, Live Strip, Full Live Moment and QR share one reward unlock. Download Photo
 is always free. The local development adapter is clearly labelled and must be
 explicitly enabled; production fails gracefully without a real provider.
 Live Strip preserves the customized design with synchronized muted motion.
-Full Live Moment compiles clips chronologically with recorded audio, without
-the strip design. Motion color is unfiltered in both outputs.
+Full Live Moment exports one continuous source with recorded audio, without
+the strip design, using original camera color. Live Strip applies each saved
+photo filter. If camera switching/navigation breaks a recording, separate runs
+are never silently joined: Full Live Moment reports that continuity is unavailable.
 QR uses private Supabase storage and enforces exactly ten minutes on the server.
 It requires the setup above; no account is needed. Print never invokes browser/system printing. Reduced
 motion skips the animation; both modes require clicking See Your Photos.
@@ -83,19 +89,19 @@ motion skips the animation; both modes require clicking See Your Photos.
 - `lib/filters/` and `components/filters/`: typed photographic presets, shared
   pixel processing, a frame-scheduled worker preview and reference-counted derived previews.
 - `lib/media/`: camera controller, Blob ownership, accurate cancellable countdown,
-  source-resolution Canvas still/upload processing and short MediaRecorder clips.
+  source-resolution Canvas still/upload processing and a continuous MediaRecorder lifecycle.
 - `components/media/`: route/session cleanup provider, video preview and capture hook.
 - `components/photobooth/photo-strip.tsx`: the single SVG strip renderer used by
   the picker, Capture, Customize, Print and Results.
 - `lib/frame-templates.ts`: canonical logical-pixel geometry, nine generated
-  templates, and the future asset-template contract with per-count variants.
+  templates and five explicitly registered original PNG frames for four-photo sessions.
 - `lib/composition.ts`: shared presentation model and crop
   math for SVG and high-resolution Canvas export. No DOM screenshot export.
 - `lib/editor/` and `components/editor/`: normalized decoration geometry, shared
   text metrics, pointer manipulation and compact editing controls.
 - `lib/render/strip-renderer.ts`: bounded, cancellable high-resolution PNG rendering.
 - `lib/gif/`: bounded worker GIF rendering/encoding, with shared crop and filter logic.
-- `lib/video/`: shared-geometry Live Strip and sequential Full Live Moment rendering.
+- `lib/video/`: shared-geometry Live Strip segments and uninterrupted Full Live Moment rendering.
 - `lib/rewards/`: provider contract, with an explicit local development adapter.
 - `lib/sharing/`, `app/api/shares/`: server-only PNG validation, private Supabase storage, expiry and cleanup.
 - `lib/design-data.ts`: frame colors/styles and ten photographic looks.
@@ -106,8 +112,8 @@ motion skips the animation; both modes require clicking See Your Photos.
 - `public/images/README.md`: sample photograph sources and licensing reference.
 
 The `(booth)` layout applies the session guard. `app/share/[id]` is a minimal
-public route outside that guard. Custom PNG frames remain untouched
-and unused. All customization and output processing happens locally; QR sharing
+public route outside that guard. Custom PNG files remain unmodified; their
+individual window geometry and transparency are shared by preview and export. All customization and output processing happens locally; QR sharing
 uploads only the requested final PNG through server-only routes.
 
 ## Validation
@@ -126,7 +132,7 @@ for local palette-based GIF encoding with dithering inside a worker.
 
 Tests use native TypeScript stripping and a local import-resolution hook,
 validated on Node 24. No test runner package was added. The earlier milestone
-reports remain historical references; `docs/milestone-7.md` records current
+reports remain historical references; `docs/milestone-8.md` records current
 behavior and validation.
 
 Optional camera integration checks use an existing Chromium executable with
@@ -151,3 +157,8 @@ Run with the local development reward adapter and Supabase HTTP fixture as descr
 in the report. `node tests/share-http.mjs` separately verifies the share API boundary.
 The fixture never contacts Supabase. A real deployment must apply the migration,
 provide server-only credentials, and schedule cleanup before QR sharing goes live.
+
+Milestone 8 integration: `CHROMIUM_PATH=/path/to/chrome-headless-shell node tests/browser-milestone8.mjs`.
+This suite defaults to port 3004; `PHOTOBOOTH_URL` overrides the origin.
+`M8_LONG_ONLY=1` runs the 10s × 12-photo capture and full-length video export stress case.
+Use isolated fixture environment values from the M8 report, never real sharing credentials.

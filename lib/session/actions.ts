@@ -14,6 +14,7 @@ export type SessionAction =
   | { type: "captures/begin" }
   | { type: "captures/restart" }
   | { type: "captures/add"; sessionId: string; capture: Capture }
+  | { type: "captures/motion"; sessionId: string; moments: readonly { id: string; motion: NonNullable<Capture["motion"]> }[] }
   | { type: "customization/replace"; customization: Customization }
   | { type: "customization/filter"; filterId: FilterId }
   | { type: "customization/frame"; frameId: FrameStyle }
