@@ -224,7 +224,7 @@ SUPABASE_URL=http://127.0.0.1:9006 \
 SUPABASE_SERVICE_ROLE_KEY=fixture-secret \
 SHARE_SIGNING_SECRET=fixture-signing-secret-at-least-32-characters \
 CRON_SECRET=fixture-cleanup-secret \
-SHARE_ORIGIN=http://127.0.0.1:3004 REWARD_DEVELOPMENT=true \
+SHARE_ORIGIN=http://127.0.0.1:3004 REWARD_DEVELOPMENT=true REWARD_LOCAL_TEST=true \
 npm run start -- --port 3004
 # Separate terminal; use an existing Chromium executable:
 CHROMIUM_PATH=/path/to/chromium node tests/browser-milestone8.mjs

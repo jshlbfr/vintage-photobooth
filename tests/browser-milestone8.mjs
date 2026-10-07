@@ -107,6 +107,7 @@ try {
    if(!sound)await click('[aria-label=\"Capture Sound\"]');
    if(audio!=='off'){if(audio==='denied')await evaluate('qa.denyAudio=true');await click('[aria-label=\"Live Moment Audio\"]');await waitFor("!document.querySelector('.audio-status').textContent.includes('Waiting')",'microphone');}
    await click('.camera-empty button');await waitFor(`document.querySelector('video')?.readyState>=2&&!document.querySelector('.camera-empty')`,'camera');
+   if(audio==='on')await waitFor(`qa.tracks.some(t=>t.kind==='audio'&&t.readyState==='live')`,'microphone track ready');
    assert(await evaluate(`getComputedStyle(document.querySelector('video')).filter==='none'&&!document.querySelector('.live-filter-canvas')`),'Original has processing');
    await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
    await click('.setup-continue');await route('/capture');await waitFor(`document.querySelectorAll('.filter-thumbnail img').length===10`,'filter thumbnails');

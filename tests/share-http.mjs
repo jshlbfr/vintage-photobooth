@@ -25,7 +25,7 @@ const second=await upload();assert.equal(second.status,201);const next=await sec
 const stats=await(await fetch(fixture+'/__test/stats')).json();assert.equal(stats.objects,2,'Expiry must work before physical deletion');
 assert.equal((await request('/api/shares/cleanup',{method:'POST'})).status,401);
 const cleanup=await request('/api/shares/cleanup',{method:'POST',headers:{Authorization:'Bearer fixture-cleanup-secret'}});assert.equal(cleanup.status,200);assert.equal((await cleanup.json()).removed,1);
-assert.equal((await upload()).status,201);assert.equal((await upload()).status,201);assert.equal((await upload()).status,503,'bounded per-session share creation');
+assert.equal((await upload()).status,201);assert.equal((await upload()).status,201);assert.equal((await upload()).status,429,'bounded per-session share creation');
 await fetch(fixture+'/__test/fail?on=1');assert.equal((await upload()).status,503);await fetch(fixture+'/__test/fail?on=0');
 const publicConfig=await new Promise((resolve,reject)=>{get(origin+'/api/reward/development',{headers:{Host:'public.example'}},r=>{let data='';r.on('data',c=>data+=c);r.on('end',()=>resolve(JSON.parse(data)));}).on('error',reject);});assert.equal(publicConfig.development,false);
 const publicUpload=await new Promise((resolve,reject)=>{const r=httpRequest(origin+'/api/shares',{method:'POST',headers:{Host:'public.example',Origin:'http://public.example',Authorization:'Bearer '+receipt,'Content-Type':'image/png','Content-Length':png.length}},r=>{r.resume();r.on('end',()=>resolve(r.statusCode));});r.on('error',reject);r.end(png);});assert.equal(publicUpload,403,'development receipt must not authorize public production sharing');

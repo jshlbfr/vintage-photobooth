@@ -5,7 +5,7 @@ import { SessionProvider } from "@/components/session/session-provider";
 import { MediaProvider } from "@/components/media/media-provider";
 import "./globals.css";
 
-import Script from "next/script";
+import { SITE_ORIGIN } from "@/lib/site";
 
 const uiFont = Poppins({
   variable: "--font-ui",
@@ -29,6 +29,7 @@ const scriptFont = Allura({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_ORIGIN),
   title: { default: "Vintage Photobooth", template: "%s · Vintage Photobooth" },
   description:
     "A little nostalgia. A memory to keep. Step inside the Vintage Photobooth.",
@@ -45,11 +46,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${uiFont.variable} ${displayFont.variable} ${scriptFont.variable}`}
     >
       <body>
-        <Script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1193568598392219"
-          crossOrigin="anonymous"
-        />
         <AmbientBackground />
         <a className="skip-link" href="#main-content">
           Skip to content

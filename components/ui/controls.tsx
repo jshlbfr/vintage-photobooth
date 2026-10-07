@@ -11,6 +11,8 @@ export function ActionLink({ href, children, className = "", arrow = true, onNav
 }
 
 export function BackLink({ href, label = "Go back", className = "" }: { href: string; label?: string; className?: string }) {
+  // Leave the booth through a new document; do not carry advertising across history entries.
+  if (href === "/") return <a href={href} className={`icon-button back-link ${className}`} aria-label={label}><Icon name="arrow-left" /></a>;
   return <Link href={href} className={`icon-button back-link ${className}`} aria-label={label}><Icon name="arrow-left" /></Link>;
 }
 

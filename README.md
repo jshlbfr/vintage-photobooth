@@ -162,3 +162,41 @@ Milestone 8 integration: `CHROMIUM_PATH=/path/to/chrome-headless-shell node test
 This suite defaults to port 3004; `PHOTOBOOTH_URL` overrides the origin.
 `M8_LONG_ONLY=1` runs the 10s × 12-photo capture and full-length video export stress case.
 Use isolated fixture environment values from the M8 report, never real sharing credentials.
+
+## Milestone 9 — content and production hardening
+
+Publisher pages now explain the real photobooth: `/`, `/how-it-works`, `/features`,
+`/faq`, `/privacy` and `/terms`. The operator/contact are The Vintage Photobooth
+and the.vintage.pb@gmail.com. Existing booth routes and capture behavior are preserved.
+
+AdSense verification remains global metadata. The unchanged Google loader only
+appears on `/`, `/how-it-works`, `/features` and `/faq`; legal, booth, share and error
+screens are ad-free. Content links use full document navigation intentionally,
+so a loaded advertising script cannot persist into the camera through SPA history.
+Google CMP is retained through the existing Google integration; regional consent
+and account settings still require manual verification. No live rewarded provider
+has been added. Never treat ordinary ad clicks/impressions as rewards.
+
+See [M9 audit and launch report](docs/milestone-9.md) and the updated
+[sharing setup](docs/sharing-setup.md), including the additive 4 MB storage migration.
+The free local PNG export retains its full resolution. Local production-build
+fixture tests now require `REWARD_LOCAL_TEST=true` as well as
+`REWARD_DEVELOPMENT=true`; both must be false in deployment. Existing `.env.local`
+is not rewritten by this milestone.
+
+```bash
+npm run lint
+npm test
+npm run build -- --webpack
+npm run typecheck
+npm audit --omit=dev
+# With the isolated server/fixture running on ports 3004/9006:
+node tests/milestone9-http.mjs
+PHOTOBOOTH_URL=http://127.0.0.1:3004 node tests/share-http.mjs
+CHROMIUM_PATH=/path/to/chromium node tests/browser-milestone9.mjs
+```
+
+The M9 browser test intercepts the Google loader with a local test response and
+checks fresh-document isolation, history navigation, no permission requests on
+content pages, and layouts from 320 to 1440 pixels. It does not click or serve real
+ads. CI uses Node 24 and the Webpack production build, with no production secrets.

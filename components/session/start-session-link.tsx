@@ -1,9 +1,4 @@
-"use client";
-
-import { ActionLink } from "@/components/ui/controls";
-import { useSessionContext } from "./session-provider";
-
+/** A new document keeps content-page advertising out of the camera. SessionGate creates the session. */
 export function StartSessionLink() {
-  const { startSession } = useSessionContext();
-  return <ActionLink href="/camera" className="button-cream" arrow={false} onNavigate={startSession}>START</ActionLink>;
+  return <a href="/camera" className="button button-cream">START</a>;
 }
