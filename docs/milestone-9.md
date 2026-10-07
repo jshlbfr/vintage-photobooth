@@ -196,7 +196,11 @@ migration/setup instructions are supplied. Deployment verification follows below
 
 ## Deployment results
 
-Implementation has not yet been verified on the public deployment. Before changes,
+Implementation commit: `a416870`. GitHub rejected the first two normal pushes with
+`remote: Internal Server Error`; a subsequent `git ls-remote` confirmed public main
+was still `bf8231e`. Production `/ads.txt` remained 404, so M9 has **not** been
+verified or claimed deployed. No force push or branch rewrite was attempted.
+Before changes,
 HTTP inspection found global ad code on utility/error pages and 404s for ads.txt,
 robots, sitemap and privacy. HSTS/CDN were already provided by Vercel. No Google
 account settings or Supabase project configuration have been modified.
@@ -213,8 +217,8 @@ account settings or Supabase project configuration have been modified.
 | Upload Security | Implemented | PNG decode, byte/pixel limits, controlled storage paths |
 | Security Headers | Implemented | Enforced baseline; resource CSP staged |
 | Hosting | Platform | Vercel HTTPS/HSTS |
-| Deployment | Needs Attention | Public M9 verification pending |
-| CI/CD | Implemented | Workflow added; remote run pending |
+| Deployment | Needs Attention | GitHub push failed; public M9 verification pending |
+| CI/CD | Implemented | Workflow added; cannot run remotely until push succeeds |
 | CDN | Platform | Static Vercel caching preserved |
 | Caching | Implemented | Temporary media no-store |
 | Scaling | Platform | Local processing plus bounded server work |
@@ -230,7 +234,7 @@ account settings or Supabase project configuration have been modified.
 live RLS/private bucket/cron and deployment configuration are checked. The optional
 reward-backed service remains unavailable in production, protecting the free flow.
 
-**M9 ADSENSE SITE READINESS: NOT READY** until M9 is deployed and its public routes,
+**M9 ADSENSE SITE READINESS: NOT READY** until the GitHub push/deployment succeeds and M9 is deployed and its public routes,
 ad isolation, configured Google CMP and account-side exclusions are checked.
 No automated re-review will be submitted. These are verification blockers, not a
 claim that Google will approve once they are completed.
