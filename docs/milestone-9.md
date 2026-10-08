@@ -84,7 +84,8 @@ the landing, feature and how-it-works pages already explain the product.
 21. **Secrets:** server-only imports and no NEXT_PUBLIC secrets. Existing environment
     files were untouched; only `.env.example` is tracked. Built client chunks were
     scanned for the configured service/signing/cron values without printing them.
-22. **Dependencies:** sharp 0.35.4 → 0.35.5; source-map-js 1.2.1 → 1.2.2.
+22. **Dependencies:** sharp 0.35.4 → 0.35.5; source-map-js 1.2.1 → 1.2.2;
+    Next.js and eslint-config-next 16.3.6 → 16.3.8 (security patch).
     Production audit: zero advisories. Full audit: five high package entries from
     one unpatched dev-only braces issue in the Next ESLint chain. The suggested
     downgrade to eslint-config-next 14 is incompatible with the current stack and
@@ -196,14 +197,28 @@ migration/setup instructions are supplied. Deployment verification follows below
 
 ## Deployment results
 
-Implementation commit: `a416870`. GitHub rejected the first two normal pushes with
-`remote: Internal Server Error`; a subsequent `git ls-remote` confirmed public main
-was still `bf8231e`. Production `/ads.txt` remained 404, so M9 has **not** been
-verified or claimed deployed. No force push or branch rewrite was attempted.
-Before changes,
-HTTP inspection found global ad code on utility/error pages and 404s for ads.txt,
-robots, sitemap and privacy. HSTS/CDN were already provided by Vercel. No Google
-account settings or Supabase project configuration have been modified.
+Implementation commit: `a416870`. The earlier GitHub internal-server push failures
+were transient. On 9 October 2026 (Asia/Manila), `5950098` pushed successfully and
+Vercel reported its deployment successful. Public HTTP checks passed for all six
+content pages, canonical metadata, advertising eligibility, security headers,
+ads.txt, robots, sitemap and no-store share responses.
+
+The expanded M9 Chromium suite also passed against the public site: 24 responsive
+layout checks, ad-script isolation through history navigation, synthetic camera
+capture, text editing, Print animation, Results and free PNG download. Microphone
+remained optional, and the production reward dialog correctly reported unavailable.
+Google advertising requests were intercepted locally, so this does not establish
+real ad delivery or regional CMP behavior. No user media or QR files were uploaded.
+
+The first remote GitHub Actions run passed installation, lint and all 103 tests,
+then failed its production dependency audit. A refreshed registry audit identified
+Next.js advisories not returned by the prior audit. The fix updates Next.js and its
+ESLint configuration to the patched 16.3.8 release; it does not disable the audit or
+upgrade to a different minor line. The production audit, lint, all 103 tests and
+production build passed again locally. The remaining five full-audit entries are
+the documented dev-only braces chain. Check the newest GitHub Actions run for the
+remote result after this patch. No Google account settings or live Supabase
+configuration were changed.
 
 ## Production readiness matrix
 
@@ -217,8 +232,8 @@ account settings or Supabase project configuration have been modified.
 | Upload Security | Implemented | PNG decode, byte/pixel limits, controlled storage paths |
 | Security Headers | Implemented | Enforced baseline; resource CSP staged |
 | Hosting | Platform | Vercel HTTPS/HSTS |
-| Deployment | Needs Attention | GitHub push failed; public M9 verification pending |
-| CI/CD | Implemented | Workflow added; cannot run remotely until push succeeds |
+| Deployment | Platform | M9 deployed; public HTTP and synthetic free-flow checks passed |
+| CI/CD | Implemented | Audit gate retained; Next security patch addresses initial failure |
 | CDN | Platform | Static Vercel caching preserved |
 | Caching | Implemented | Temporary media no-store |
 | Scaling | Platform | Local processing plus bounded server work |
@@ -234,8 +249,9 @@ account settings or Supabase project configuration have been modified.
 live RLS/private bucket/cron and deployment configuration are checked. The optional
 reward-backed service remains unavailable in production, protecting the free flow.
 
-**M9 ADSENSE SITE READINESS: NOT READY** until the GitHub push/deployment succeeds and M9 is deployed and its public routes,
-ad isolation, configured Google CMP and account-side exclusions are checked.
+**M9 ADSENSE SITE READINESS: NOT READY** until configured Google CMP behavior
+and account-side advertising settings/exclusions are verified. Public routes,
+ads.txt and document-level ad isolation have passed deployment checks.
 No automated re-review will be submitted. These are verification blockers, not a
 claim that Google will approve once they are completed.
 
@@ -250,3 +266,5 @@ claim that Google will approve once they are completed.
 - [sharp advisory](https://github.com/advisories/GHSA-wq5f-xc86-pv6w)
 - [source-map-js advisory](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)
 - [dev-only braces advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
+
+- [Next.js 16.3.8 security release](https://github.com/vercel/next.js/releases/tag/v16.3.8)

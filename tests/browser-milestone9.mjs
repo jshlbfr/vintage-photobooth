@@ -84,6 +84,28 @@ try {
  assert(await evaluate('!window.__m9AdLoaded && !document.querySelector("script[src*=googlesyndication]")'),'ad globals cleared entering camera');report.checks.push('content → booth starts a fresh ad-free document');
  await evaluate('history.back()');await waitFor('location.pathname==="/"');await evaluate('history.forward()');await waitFor('location.pathname==="/camera"');await delay(300);assert(await evaluate('!window.__m9AdLoaded'),'history forward remains ad-free');
  await evaluate('document.querySelector(".back-link").click()');await waitFor('location.pathname==="/" && !!window.__m9AdLoaded');await evaluate('history.back()');await waitFor('location.pathname==="/camera"');assert(await evaluate('!window.__m9AdLoaded'),'history back remains ad-free');report.checks.push('back/forward and booth exit preserve document isolation');
+ // Exercise the deployed free flow using synthetic devices; no uploads or real ads.
+ await cdp('Page.navigate',{url:origin+'/camera'});await waitFor('!!document.querySelector(".setup-panel")');
+ await evaluate(`[...document.querySelectorAll('[aria-label="Photo count"] button')].find(b=>b.textContent==='1').click()`);
+ await evaluate(`[...document.querySelectorAll('[aria-label="Timer"] button')].find(b=>b.textContent==='1s').click()`);
+ await evaluate('document.querySelector(".camera-empty button").click()');await waitFor('document.querySelector("video")?.readyState>=2 && !document.querySelector(".camera-empty")');
+ assert(await evaluate(`document.querySelector('[aria-label="Live Moment Audio"]').getAttribute('aria-checked')==='false'`),'microphone remains optional');
+ await evaluate('document.querySelector(".setup-continue").click()');await waitFor('location.pathname==="/capture" && !document.querySelector(".capture-actions button:last-child").disabled');
+ await evaluate('document.querySelector(".capture-actions button:last-child").click()');await waitFor('!!document.querySelector("a.choose-frame")');
+ await evaluate('document.querySelector("a.choose-frame").click()');await waitFor('location.pathname==="/customize" && !!document.querySelector(".add-text")');
+ await evaluate('document.querySelector(".add-text").click()');await waitFor('!!document.querySelector(".editor-inspector textarea")');
+ await evaluate('window.__m9PrintCalls=0;window.print=()=>window.__m9PrintCalls++;document.querySelector(".print-action").click()');await waitFor('!!document.querySelector(".print-continuation a")');await delay(500);
+ assert(await evaluate('location.pathname==="/print" && window.__m9PrintCalls===0'),'Print remains an explicit animation');
+ await evaluate('document.querySelector(".print-continuation a").click()');await waitFor('location.pathname==="/results" && !!document.querySelector(".result-action")');
+ await cdp('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:out});
+ await cdp('Runtime.evaluate',{expression:`[...document.querySelectorAll('.result-action')].find(b=>b.textContent.includes('Download Photo')).click()`,userGesture:true});
+ await waitFor('document.querySelector(".preview-note").textContent.includes("Check your downloads")');
+ assert(await evaluate('!window.__m9AdLoaded && !document.querySelector("script[src*=googlesyndication]")'),'complete free flow ad-free');
+ if(!['localhost','127.0.0.1'].includes(new URL(origin).hostname)){
+  await evaluate(`[...document.querySelectorAll('.result-action')].find(b=>b.textContent.includes('Generate GIF')).click()`);await waitFor('document.body.innerText.includes("Rewards are not available yet")');
+  assert(await evaluate('!document.body.innerText.includes("Complete development reward")'),'production rewards fail closed');
+ }
+ report.checks.push('synthetic camera → capture → edit → Print → Results → free PNG; optional microphone; production reward denial');
  for(const path of ['/capture','/customize','/print','/results','/share/invalid','/missing-m9-page']){
   await cdp('Page.navigate',{url:origin+path});await delay(900);assert(await evaluate('!window.__m9AdLoaded && !document.querySelector("script[src*=googlesyndication]")'),path+' ad-free');report.checks.push(path+' ad-free');
  }
