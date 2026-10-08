@@ -1,4 +1,4 @@
-# The Vintage Booth 📸
+# The Vintage Photobooth 📸
 
 **A little nostalgia. A memory to keep.**
 
