@@ -1,3 +1,4 @@
+import type { PhotoAdjustment, NormalizedCrop } from './editor/photo-geometry';
 import type { PlacedSticker, PlacedText } from "./session/types";
 import type { PhotoCount, FilterId } from "./design-data";
 import { getFrameTemplate, resolveFrameLayout } from "./frame-templates";
@@ -5,7 +6,7 @@ import { getFrameTemplate, resolveFrameLayout } from "./frame-templates";
 /** Presentation geometry, shared by every strip. No media or session lifecycle here. */
 export type StripComposition = {
   count: PhotoCount;
-  photos: readonly { src?: string; alt: string; fit?: "cover" | "contain"; filterId?: FilterId }[];
+  photos: readonly { id?: string; width?: number; height?: number; adjustment?: PhotoAdjustment; initialCrop?: NormalizedCrop; flashExposure?: boolean; src?: string; alt: string; fit?: "cover" | "contain"; filterId?: FilterId }[];
   frameColor: string;
   frameStyle: string;
   caption?: string;

@@ -28,7 +28,7 @@ export function sessionReducer(session: PhotoBoothSession | null, action: Sessio
         ...session, preferences: { ...session.preferences, photoCount: action.count },
         // A different capture plan cannot keep an old, mismatched strip/output.
         capturePlanReady: false, captures: [], outputs: {},
-        customization: { ...session.customization, frameId: frame && supportsPhotoCount(frame, action.count) ? frame.id as Customization["frameId"] : "classic" },
+        customization: { ...session.customization, stickers: [], texts: [], photoAdjustments: {}, frameId: frame && supportsPhotoCount(frame, action.count) ? frame.id as Customization["frameId"] : "classic" },
       };
     }
     case "camera/sound":
@@ -36,7 +36,7 @@ export function sessionReducer(session: PhotoBoothSession | null, action: Sessio
     case "camera/audio":
       return { ...session, preferences: { ...session.preferences, audioEnabled: action.enabled } };
     case "captures/begin": return { ...session, capturePlanReady: true };
-    case "captures/restart": return { ...session, captures: [], outputs: {} };
+    case "captures/restart": return { ...session, captures: [], outputs: {}, customization: { ...session.customization, stickers: [], texts: [], photoAdjustments: {} } };
     case "captures/add":
       if (action.sessionId !== session.id || !session.capturePlanReady || session.captures.length >= session.preferences.photoCount || session.captures.some(capture => capture.id === action.capture.id)) return session;
       return { ...session, captures: [...session.captures, action.capture], outputs: {} };

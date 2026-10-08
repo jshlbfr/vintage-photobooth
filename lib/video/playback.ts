@@ -1,3 +1,4 @@
+import { photoCrop, type PhotoAdjustment } from '../editor/photo-geometry';
 import type { Capture } from '../session/types';
 import { clipSeconds, motionCrop } from './geometry';
 import { wait } from '../media/countdown';
@@ -16,9 +17,9 @@ export async function loadVideo(url:string,signal:AbortSignal){
   }catch(error){disposeVideo(video);throw error;}
 }
 export function disposeVideo(video:HTMLVideoElement){video.pause();video.removeAttribute('src');video.load();}
-export function drawMotion(ctx:CanvasRenderingContext2D,video:HTMLVideoElement,capture:Capture,slot:{x:number;y:number;width:number;height:number;radius?:number},graded?:HTMLCanvasElement){
+export function drawMotion(ctx:CanvasRenderingContext2D,video:HTMLVideoElement,capture:Capture,slot:{x:number;y:number;width:number;height:number;radius?:number},graded?:HTMLCanvasElement,adjustment?:PhotoAdjustment,stripPhoto=false){
   if(!capture.motion||video.readyState<2)return;
-  const crop=motionCrop(graded?.width??video.videoWidth,graded?.height??video.videoHeight,capture.motion,slot.width,slot.height);
+  const crop=stripPhoto&&capture.initialCrop?photoCrop(graded?.width??video.videoWidth,graded?.height??video.videoHeight,slot.width,slot.height,adjustment?{...adjustment,x:capture.motion.mirrored?1-adjustment.x:adjustment.x}:undefined,capture.initialCrop):motionCrop(graded?.width??video.videoWidth,graded?.height??video.videoHeight,capture.motion,slot.width,slot.height);
   ctx.save();ctx.beginPath();ctx.roundRect(slot.x,slot.y,slot.width,slot.height,slot.radius??0);ctx.clip();
   ctx.translate(slot.x+(capture.motion.mirrored?slot.width:0),slot.y);if(capture.motion.mirrored)ctx.scale(-1,1);
   ctx.drawImage(graded??video,crop.x,crop.y,crop.width,crop.height,0,0,slot.width,slot.height);ctx.restore();

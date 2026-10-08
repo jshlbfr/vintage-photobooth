@@ -8,12 +8,12 @@ export async function captureStill(video: HTMLVideoElement, mirrored: boolean) {
   if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) throw new Error("The camera is still warming up. Try again in a moment.");
   const crop = getCoverCrop(video.videoWidth, video.videoHeight, video.clientWidth || 650, video.clientHeight || 400);
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(crop.width); canvas.height = Math.round(crop.height);
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
   try {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("This browser could not create a photograph.");
     if (mirrored) { context.translate(canvas.width, 0); context.scale(-1, 1); }
-    context.drawImage(video, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
     return { blob: await encode(canvas), width: canvas.width, height: canvas.height,
       crop: { x: crop.x / video.videoWidth, y: crop.y / video.videoHeight, width: crop.width / video.videoWidth, height: crop.height / video.videoHeight } };
   } finally { canvas.width = 0; canvas.height = 0; }

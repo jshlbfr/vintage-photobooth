@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { usePhotoBoothSession } from '@/components/session/session-provider';
 import { useMedia, useStripComposition } from './media-provider';
 import { generateGif } from '@/lib/gif/generate';
+import { getStripLayout } from '@/lib/composition';
 import { gifDimensions } from '@/lib/gif/geometry';
 export function useGif(){
   const {session,dispatch}=usePhotoBoothSession(),{store}=useMedia(),composition=useStripComposition();
@@ -15,10 +16,11 @@ export function useGif(){
     if(operation.current||(!force&&src))return;
     const controller=new AbortController();operation.current=controller;setBusy(true);setMessage('Preparing your GIF…');
     try{
-      const sources=session.captures.map(c=>{
+      const sources=session.captures.map((c,index)=>{
         const blob=c.still.kind==='local'?store.getBlob(c.still.resourceId):undefined;
         if(!blob)throw new Error('A source photo is missing. Return to Capture and try again.');
-        return {blob,filter:c.filterAtCapture,fit:c.source==='sample'?'contain' as const:'cover' as const};
+        const slot=getStripLayout(composition).slots[index];
+        return {blob,adjustment:composition.photos[index].adjustment,initialCrop:c.initialCrop,flashExposure:c.flashExposure,slotRatio:slot.width/slot.height,filter:c.filterAtCapture,fit:c.source==='sample'?'contain' as const:'cover' as const};
       });
       const dimensions=gifDimensions(composition);
       const blob=await generateGif({...dimensions,sources},controller.signal,(done,total)=>setMessage(done===total?'Encoding your GIF…':`Preparing photo ${done} of ${total}…`));

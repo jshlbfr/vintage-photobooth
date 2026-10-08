@@ -1,9 +1,9 @@
 import { Encoder } from 'modern-gif';
-import { getCoverCrop } from '../composition';
+import { photoCrop, type PhotoAdjustment, type NormalizedCrop } from '../editor/photo-geometry';
 import { gradeCanvas } from '../filters/engine';
 import type { FilterId } from '../filters/presets';
 import { GIF_DELAY_MS } from './geometry';
-export type GifSource={blob:Blob;filter:FilterId;fit:'cover'|'contain'};
+export type GifSource={blob:Blob;filter:FilterId;fit:'cover'|'contain';adjustment?:PhotoAdjustment;initialCrop?:NormalizedCrop;flashExposure?:boolean;slotRatio?:number};
 export type GifRequest={sources:GifSource[];width:number;height:number};
 export type GifReply={kind:'progress';done:number;total:number}|{kind:'complete';buffer:ArrayBuffer}|{kind:'error';message:string};
 const scope=self as unknown as {onmessage:((event:MessageEvent<GifRequest>)=>void)|null;postMessage:(data:GifReply,transfer?:Transferable[])=>void};
@@ -20,11 +20,11 @@ scope.onmessage=async({data:{sources,width,height}})=>{
         const scale=Math.min(1,960/Math.max(image.width,image.height));
         work=new OffscreenCanvas(Math.max(1,Math.round(image.width*scale)),Math.max(1,Math.round(image.height*scale)));
         const pixels=work.getContext('2d',{willReadFrequently:true});if(!pixels)throw new Error('Photo processing is unavailable.');
-        pixels.imageSmoothingQuality='high';pixels.drawImage(image,0,0,work.width,work.height);gradeCanvas(work,source.filter);
+        pixels.imageSmoothingQuality='high';pixels.drawImage(image,0,0,work.width,work.height);gradeCanvas(work,source.filter,17,source.flashExposure);
         ctx.fillStyle='#050403';ctx.fillRect(0,0,width,height);
         if(source.fit==='contain'){
           const factor=Math.min(width/work.width,height/work.height),w=work.width*factor,h=work.height*factor;ctx.drawImage(work,(width-w)/2,(height-h)/2,w,h);
-        }else{const crop=getCoverCrop(work.width,work.height,width,height);ctx.drawImage(work,crop.x,crop.y,crop.width,crop.height,0,0,width,height);}
+        }else{const crop=photoCrop(work.width,work.height,source.slotRatio??width/height,1,source.adjustment,source.initialCrop);const scale=Math.min(width/crop.width,height/crop.height),w=crop.width*scale,h=crop.height*scale;ctx.drawImage(work,crop.x,crop.y,crop.width,crop.height,(width-w)/2,(height-h)/2,w,h);}
         await encoder.encode({data:ctx.getImageData(0,0,width,height).data,width,height,delay:GIF_DELAY_MS,disposal:1});
         scope.postMessage({kind:'progress',done:i+1,total:sources.length});
       }finally{image.close();if(work){work.width=0;work.height=0;}}

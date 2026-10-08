@@ -12,6 +12,8 @@ export function selectStripComposition(session: PhotoBoothSession, resolveMedia?
     count: session.preferences.photoCount,
     photos: session.captures.map((capture, index) => ({
       src: resolveMedia ? resolveMedia(capture.still) : capture.still.kind === "sample" ? capture.still.src : undefined,
+      id: capture.id, width: capture.still.width, height: capture.still.height,
+      adjustment: session.customization.photoAdjustments[capture.id], initialCrop: capture.initialCrop, flashExposure: capture.flashExposure,
       filterId: capture.filterAtCapture,
       alt: `${capture.source === "sample" ? "Sample p" : "P"}hotograph ${index + 1}`,
       fit: capture.source === "sample" ? "contain" : "cover",

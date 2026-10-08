@@ -30,6 +30,7 @@ const scriptFont = Allura({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_ORIGIN),
+  ...(process.env.VERCEL_ENV === 'preview' ? {robots:{index:false,follow:false}} : {}),
   title: { default: "Vintage Photobooth", template: "%s · Vintage Photobooth" },
   description:
     "A little nostalgia. A memory to keep. Step inside the Vintage Photobooth.",

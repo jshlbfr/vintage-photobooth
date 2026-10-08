@@ -200,3 +200,25 @@ The M9 browser test intercepts the Google loader with a local test response and
 checks fresh-document isolation, history navigation, no permission requests on
 content pages, and layouts from 320 to 1440 pixels. It does not click or serve real
 ads. CI uses Node 24 and the Webpack production build, with no production secrets.
+
+## Milestone 9.5 — photo adjustments and controlled releases
+
+Each photo can be selected, dragged and zoomed independently in Customize. Reset
+Photo affects only that slot; Undo/Redo includes completed photo gestures. The
+shared crop geometry follows the composition into PNG, GIF and Live Strip, while
+Full Live Moment keeps its continuous chronological recording. Camera originals
+retain the complete video frame; edits never replace them with preview crops.
+
+Work on `milestone-9-5` or a feature branch. See
+[the controlled release workflow](docs/release-workflow.md) for Preview isolation,
+manual production promotion, environment separation and rollback. Production
+account settings must be reviewed and configured by the operator before a merge
+can be treated as a staged release.
+
+The focused browser suite uses synthetic devices and local fixture configuration:
+
+```bash
+CHROMIUM_PATH=/path/to/chromium node tests/browser-milestone95.mjs
+```
+
+See [the M9.5 report](docs/milestone-9.5.md) for verification and remaining manual steps.

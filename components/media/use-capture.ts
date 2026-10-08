@@ -80,22 +80,22 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
         transition('counting');
         const startMs=recorder.current?.currentTimeMs()??0;
         await runCountdown(session.preferences.timerSeconds,controller.signal,remaining=>{
-          if(remaining>0){flushSync(()=>setCountdown(remaining));if(remaining>1&&session.preferences.captureSound)sound.current?.beep();}
+          if(remaining>0){flushSync(()=>setCountdown(remaining));if(session.preferences.captureSound)sound.current?.beep();}
         });
         controller.signal.throwIfAborted();
         if(element.readyState<2||!element.videoWidth)throw new Error('The camera is warming up. Try again in a moment.');
         transition('capturing');
-        const flashStarted=performance.now();
         if(session.preferences.flash){
           flushSync(()=>setFlash(true));
-          flashTimer.current=setTimeout(()=>{flashTimer.current=null;if(mounted.current)setFlash(false);},400);
         }
-        if(session.preferences.captureSound)sound.current?.shutter();
         if(session.preferences.flash){
           await afterPaint(controller.signal);
-          await wait(Math.max(0,120-(performance.now()-flashStarted)),controller.signal);
+          // Start the visible interval after a paint, so slow frames cannot consume it.
+          flashTimer.current=setTimeout(()=>{flashTimer.current=null;if(mounted.current)setFlash(false);},480);
+          await wait(160,controller.signal);
         }
         controller.signal.throwIfAborted();
+        if(session.preferences.captureSound)sound.current?.shutter();
         const timestamp=Date.now();
         // Read the raw camera frame independently from the HTML illumination overlay.
         const stillPromise=captureStill(element,session.preferences.mirrored);
@@ -107,14 +107,15 @@ export function useCapture(video: RefObject<HTMLVideoElement | null>) {
         const reference=store.add(still.blob,still.width,still.height);allocated.push(reference);
         const id=crypto.randomUUID();
         if(recorder.current?.available)segments.current.push({id,still:reference,startMs,durationMs:endMs-startMs,mirrored:session.preferences.mirrored,crop:still.crop});
-        dispatch({type:'captures/add',sessionId:session.id,capture:{id,source:'camera',still:reference,capturedAt:timestamp,filterAtCapture:session.customization.filterId,mirrorApplied:session.preferences.mirrored}});
+        dispatch({type:'captures/add',sessionId:session.id,capture:{id,source:'camera',still:reference,capturedAt:timestamp,filterAtCapture:session.customization.filterId,mirrorApplied:session.preferences.mirrored,initialCrop:still.crop,flashExposure:session.preferences.flash}});
         allocated.length=0;count++;
         setMessage(count===session.preferences.photoCount?'All photos are ready. Choose your frame.':pauseRequested.current?'Paused. Resume when you’re ready.':recorder.current?.available?'Photo saved · the full countdown is recorded.':'Photo saved. Motion recording is unavailable in this browser.');
       } while(continuous&&count<session.preferences.photoCount&&!pauseRequested.current&&!controller.signal.aborted);
       if(count>=session.preferences.photoCount&&!await finishRecording())setMessage('Your photos are ready. Motion recording was unavailable; your still photos are safe.');
-      // Keep the established 400 ms flash visible after the last/manual shutter.
-      if(flashTimer.current)await wait(300,controller.signal);
+      // The overlay owns its deadline independently of image encoding.
+      if(flashTimer.current)await wait(320,controller.signal);
     } catch(error){
+      clearFlash();
       if(!controller.signal.aborted)setMessage(error instanceof Error?error.message:'Capture failed. Please try again.');
     } finally {
       for(const reference of allocated)if(reference.kind==='local')store.release(reference.resourceId);

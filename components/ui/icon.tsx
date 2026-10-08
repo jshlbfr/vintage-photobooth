@@ -1,8 +1,10 @@
 import type { SVGProps } from "react";
 
-export type IconName = "arrow-left" | "arrow-right" | "chevron-left" | "chevron-right" | "camera" | "switch-camera" | "download" | "play" | "qr" | "edit" | "text" | "gif" | "check" | "lock";
+export type IconName = "undo" | "redo" | "arrow-left" | "arrow-right" | "chevron-left" | "chevron-right" | "camera" | "switch-camera" | "download" | "play" | "qr" | "edit" | "text" | "gif" | "check" | "lock";
 
 const paths: Record<IconName, React.ReactNode> = {
+  undo: <path d="M9 4 4 9l5 5M4 9h10a6 6 0 0 1 0 12" />,
+  redo: <path d="m15 4 5 5-5 5m5-5H10a6 6 0 0 0 0 12" />,
   "arrow-left": <path d="M19 12H5m6-6-6 6 6 6" />,
   "arrow-right": <path d="M5 12h14m-6-6 6 6-6 6" />,
   "chevron-left": <path d="m14 7-5 5 5 5" />,

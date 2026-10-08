@@ -26,7 +26,7 @@ test('positions are recoverable, aspect ratios preserved and additions stagger',
  assert.notDeepEqual(newPlacement(custom()),newPlacement({...custom(),texts:[]}));
 });
 for(const count of [1,2,4,5,6,8,10,12])test(`${count} photos preserve normalized editing data through every generated frame, with bounded high-resolution output`,()=>{
- let s={...createSession('s',0),customization:custom()};s=sessionReducer(s,{type:'camera/count',count});
+ let s=sessionReducer(createSession('s',0),{type:'camera/count',count});s={...s,customization:custom()};
  for(const frame of FRAME_STYLES){
   s=sessionReducer(s,{type:'customization/frame',frameId:frame.id});const c=selectStripComposition(s),l=getStripLayout(c),d=exportDimensions(l);
   assert.equal(l.slots.length,count);assert.equal(new Set(l.slots.map(s=>s.x)).size,count>=6?2:1);

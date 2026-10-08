@@ -33,7 +33,7 @@ export const FAQ = [
   ],
   [
     "How does the screen flash work?",
-    "When enabled, each camera shutter briefly fills the viewport with pure white. The still is read from the camera video after a short illumination delay. Turn Flash off if you do not want this effect. It cannot raise your device’s physical display brightness."
+    "When enabled, each camera shutter briefly fills the viewport with pure white. The still is read from the camera video after a short illumination delay. A gentle digital brightening effect is applied to the photo before its selected filter, keeping the original capture intact. Turn Flash off if you do not want these effects. It cannot raise your device’s physical display brightness."
   ],
   [
     "What is a Live Moment? Does it include the countdown?",

@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react';
 import { PhotoStrip } from '@/components/photobooth/photo-strip';
 import { getStripLayout, type StripComposition } from '@/lib/composition';
 import { orderedElements, safeElement, stickerDimensions, type Decoration } from '@/lib/editor/geometry';
 import { textGeometry } from '@/lib/editor/text';
 
 type Gesture={pointer:number;mode:'move'|'resize'|'rotate';original:Decoration;start:DOMPoint;latest:Decoration};
-export function StripEditor({composition,selectedId,onSelect,onCommit}:{composition:StripComposition;selectedId:string|null;onSelect:(id:string|null)=>void;onCommit:(element:Decoration)=>void}){
+export function StripEditor({composition,selectedId,onSelect,onCommit,photoLayer}:{photoLayer?:ReactNode;composition:StripComposition;selectedId:string|null;onSelect:(id:string|null)=>void;onCommit:(element:Decoration)=>void}){
   const svg=useRef<SVGSVGElement>(null), gesture=useRef<Gesture|null>(null);
   const [draft,setDraft]=useState<Decoration|null>(null),[zoom,setZoom]=useState(1);
   const layout=getStripLayout(composition);
@@ -42,7 +42,7 @@ export function StripEditor({composition,selectedId,onSelect,onCommit}:{composit
   const bounds=(e:Decoration)=>e.type==='sticker'?stickerDimensions(e,layout):textGeometry(e,layout);
   const handle=14/zoom;
   const selectedBounds=selected?bounds(selected):null;
-  return <PhotoStrip composition={shown} svgRef={svg} onPointerDown={()=>onSelect(null)} label="Editable photostrip" editorLayer={<g className="editor-layer">
+  return <PhotoStrip composition={shown} svgRef={svg} onPointerDown={()=>onSelect(null)} label="Editable photostrip" editorLayer={<g className="editor-layer">{photoLayer}
     {elements.map(e=>{const b=bounds(e);return <rect key={e.id} data-editor-object={e.id} role="button" tabIndex={0} aria-label={e.type==='sticker'?`${e.assetId} sticker`:`Text: ${e.content}`} aria-pressed={e.id===selectedId} transform={`translate(${e.x*layout.width} ${e.y*layout.height}) rotate(${e.rotation})`} x={-b.width/2} y={-b.height/2} width={b.width} height={b.height} fill="transparent" className="editor-object" onFocus={()=>onSelect(e.id)} onPointerDown={event=>begin(event,e,'move')} {...handlers} onKeyDown={event=>{
       if(event.key==='Enter'||event.key===' '){event.preventDefault();onSelect(e.id);}
       const step=event.shiftKey?.025:.005;

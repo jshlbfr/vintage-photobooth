@@ -2,7 +2,7 @@ name: Validate
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, milestone-9-5, "feature/**"]
 permissions:
   contents: read
 concurrency:

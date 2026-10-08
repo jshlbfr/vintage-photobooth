@@ -1,5 +1,6 @@
+import { photoCrop } from '../editor/photo-geometry';
 import { getFrameTemplate } from '../frame-templates';
-import { getCoverCrop, getStripLayout, type StripComposition } from '../composition';
+import { getStripLayout, type StripComposition } from '../composition';
 import { STICKER_ASSETS } from '../artwork';
 import { exportDimensions, orderedElements, stickerDimensions } from '../editor/geometry';
 import { fontFamily, textGeometry } from '../editor/text';
@@ -13,9 +14,9 @@ async function loadImage(src:string,signal:AbortSignal){
   finally{signal.removeEventListener('abort',abort);}
 }
 function pause(){return new Promise<void>(resolve=>setTimeout(resolve,0));}
-async function grade(work:HTMLCanvasElement,filter:FilterId,signal:AbortSignal){
-  if(filter==='original')return;
-  if(typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined'){await pause();signal.throwIfAborted();gradeCanvas(work,filter);return;}
+async function grade(work:HTMLCanvasElement,filter:FilterId,signal:AbortSignal,flashExposure=false){
+  if(filter==='original'&&!flashExposure)return;
+  if(typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined'){await pause();signal.throwIfAborted();gradeCanvas(work,filter,17,flashExposure);return;}
   let worker:Worker|null=null,bitmap:ImageBitmap|null=null;
   try{
     worker=new Worker(new URL('../filters/preview-worker.ts',import.meta.url));
@@ -30,7 +31,7 @@ async function grade(work:HTMLCanvasElement,filter:FilterId,signal:AbortSignal){
         cleanup();if('error' in data){reject(new Error('Filter rendering failed. Please try again.'));return;}
         try{signal.throwIfAborted();work.getContext('2d')!.drawImage(data.bitmap,0,0);resolve();}catch(error){reject(error);}finally{data.bitmap.close();}
       };
-      try{active.postMessage({bitmap,filter},[bitmap!]);bitmap=null;}catch(error){cleanup();reject(error);}
+      try{active.postMessage({bitmap,filter,flashExposure},[bitmap!]);bitmap=null;}catch(error){cleanup();reject(error);}
     });
   }finally{bitmap?.close();worker?.terminate();}
 }
@@ -58,18 +59,18 @@ export async function renderStrip(composition:StripComposition,signal:AbortSigna
       if(!photo?.src)throw new Error('A photograph is missing. Return to Capture and try again.');
       const image=await loadImage(photo.src,signal);
       try{
-        const crop=photo.fit==='contain'?{x:0,y:0,width:image.naturalWidth,height:image.naturalHeight}:getCoverCrop(image.naturalWidth,image.naturalHeight,slot.width,slot.height);
-        const factor=Math.min(1,2048/Math.max(image.naturalWidth,image.naturalHeight),Math.max(slot.width*dimensions.scale/crop.width,slot.height*dimensions.scale/crop.height));
+        const crop=photo.fit==='contain'?{x:0,y:0,width:image.naturalWidth,height:image.naturalHeight}:photoCrop(image.naturalWidth,image.naturalHeight,slot.width,slot.height,photo.adjustment,photo.initialCrop);
+        const factor=Math.min(1,Math.max(slot.width*dimensions.scale/crop.width,slot.height*dimensions.scale/crop.height));
         work.width=Math.max(1,Math.round(image.naturalWidth*factor));work.height=Math.max(1,Math.round(image.naturalHeight*factor));
         const source=work.getContext('2d',{willReadFrequently:true});if(!source)throw new Error('Photo rendering is unavailable.');
         source.imageSmoothingEnabled=true;source.imageSmoothingQuality='high';source.drawImage(image,0,0,work.width,work.height);
-        await grade(work,photo.filterId??'original',signal);signal.throwIfAborted();
+        await grade(work,photo.filterId??'original',signal,photo.flashExposure);signal.throwIfAborted();
         ctx.save();ctx.beginPath();ctx.roundRect(slot.x,slot.y,slot.width,slot.height,slot.radius);ctx.clip();ctx.fillStyle='#050403';ctx.fillRect(slot.x,slot.y,slot.width,slot.height);
         if(photo.fit==='contain'){
           const scale=Math.min(slot.width/work.width,slot.height/work.height),w=work.width*scale,h=work.height*scale;
           ctx.drawImage(work,slot.x+(slot.width-w)/2,slot.y+(slot.height-h)/2,w,h);
         }else{
-          const c=getCoverCrop(work.width,work.height,slot.width,slot.height);ctx.drawImage(work,c.x,c.y,c.width,c.height,slot.x,slot.y,slot.width,slot.height);
+          const c=photoCrop(work.width,work.height,slot.width,slot.height,photo.adjustment,photo.initialCrop);ctx.drawImage(work,c.x,c.y,c.width,c.height,slot.x,slot.y,slot.width,slot.height);
         }
         ctx.restore();onProgress?.(i+1,layout.slots.length);await pause();
       }finally{image.src='';work.width=0;work.height=0;}

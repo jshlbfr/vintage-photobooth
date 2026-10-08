@@ -5,7 +5,7 @@ import { mkdir, writeFile, readFile, unlink } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import './register-typescript.mjs';
 
-const out = resolve('.review/m8');
+const out = resolve('.review/m95');
 const origin = new URL(process.env.PHOTOBOOTH_URL ?? 'http://127.0.0.1:3004').origin;
 const executable = process.env.CHROMIUM_PATH;
 if (!executable) throw new Error('Set CHROMIUM_PATH to a Chromium or chrome-headless-shell executable. Start the production server first.');
@@ -63,7 +63,7 @@ try {
  const assert=(v,m)=>{if(!v)throw new Error(m);};
  const waitFor=async(expression,name,timeout=15000)=>{const start=Date.now();while(Date.now()-start<timeout){if(await evaluate(expression))return;await delay(60);}throw new Error('Timeout '+name+': '+await evaluate('document.body.innerText'));};
  const route=path=>waitFor(`location.pathname===${JSON.stringify(path)}`,path);
- const click=async selector=>{await evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);await delay(60);};
+ const click=async selector=>{await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(e instanceof HTMLElement)e.click();else e.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));})()`);await delay(60);};
  const choose=async(label,value)=>{await evaluate(`[...document.querySelectorAll('[aria-label="${label}"] button')].find(b=>b.textContent===${JSON.stringify(value)}).click()`);await delay(60);};
  await cdp('Page.enable');await cdp('Runtime.enable');await cdp('Log.enable');await cdp('Network.enable');
  await cdp('Network.setBlockedURLs',{urls:['*googlesyndication.com*','*doubleclick.net*']});
@@ -115,12 +115,11 @@ try {
    await center('.capture-strip');await layout(1440,1024,count===8);await layout(1366,768);await layout(390,844,count===8);await layout(1440);
  };
  const action=async title=>{await evaluate(`[...document.querySelectorAll('.result-action')].find(b=>b.textContent.includes(${JSON.stringify(title)})).click()`);await delay(60);};
- const results=async()=>{await click('.choose-frame');await route('/customize');await click('[aria-label=\"Add heart sticker\"]');await click('.add-text');await evaluate(`(()=>{const e=document.querySelector('.editor-inspector textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'LIVE TEST');e.dispatchEvent(new Event('input',{bubbles:true}));})()`);await click('[aria-label=\"Vanilla\"]');await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print finished');await delay(200);assert(await evaluate(`location.pathname==='/print'&&qa.print===0`),'Print behavior');await click('.print-continuation a');await route('/results');};
  const close=()=>click('[aria-label="Close media preview"]');
  const blobData=url=>evaluate(`(async()=>{const b=qa.urls.get(${JSON.stringify(url)});return {type:b.type,size:b.size,data:await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result.slice(f.result.indexOf(';base64,')+8));f.readAsDataURL(b);})};})()`);
  const saveDownload=async(selector,name,expected)=>{
    await unlink(out+'/downloads/'+name).catch(()=>{});
-   await cdp('Runtime.evaluate',{expression:`document.querySelector(${JSON.stringify(selector)}).click()`,userGesture:true});let bytes;
+   await cdp('Runtime.evaluate',{expression:`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(e instanceof HTMLElement)e.click();else e.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));})()`,userGesture:true});let bytes;
    for(let i=0;i<100;i++){try{bytes=await readFile(out+'/downloads/'+name);if(bytes.equals(expected))break;}catch{}await delay(60);}
    assert(bytes?.equals(expected),'download bytes differ '+name+' saved='+bytes?.length+' expected='+expected.length);
  };
@@ -160,39 +159,58 @@ try {
    else {await click('.capture-actions button:last-child');await waitFor(`document.querySelector('.capture-counter strong')?.textContent==='${count}/${count}'`,'all photos',timer*count*1000+20000);}
    await checkTimeline(timer,count,{manual:timer===1,flash:options.flash!==false});
  };
- console.log('M8 complete countdown / continuous source');
- if(!process.env.M8_LONG_ONLY){
- await captureSession(5,4,{audio:'on',filter:'Mono'});
+
+ console.log('M9.5 photo adjustments');
+ await captureSession(1,4);
+ const timeline=await evaluate('({sounds:qa.sounds,flashes:qa.flashes,shots:qa.shots})');
+ for(let i=0;i<4;i++){
+  assert(timeline.sounds.filter(s=>s.kind==='beep')[i].text==='Smile!','Smile beep missing');
+  assert(timeline.shots[i].at-timeline.flashes[i].at>=150,'flash lead too short');
+  assert(timeline.flashes[i].duration>=470,'flash removed early');
+ }
  await click('.choose-frame');await route('/customize');
- for(let i=0;i<9;i++)await click('[aria-label="Next frame"]');
- for(let i=1;i<=5;i++){
-   assert(await evaluate(`document.querySelector('.customize-preview svg image[href^="/frames/"]')?.getAttribute('href').endsWith(' ${i}.png')`),'custom frame missing '+i);
-   await layout(1440);await layout(390,844);await layout(844,390);await layout(1440);
-   const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(out+'/custom-frame-'+i+'.png',Buffer.from(shot.data,'base64'));
-   await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'frame print');
-   assert(await evaluate(`document.querySelector('.print-output image[href^="/frames/"]').getAttribute('href').endsWith(' ${i}.png')`),'Print lost asset');
-   await click('.print-continuation a');await route('/results');await action('Download Photo');await waitFor(`document.querySelector('.preview-note').textContent.includes('Check your downloads')`,'frame PNG');
-   const pngUrl=await evaluate(`[...qa.urls.entries()].find(([u,b])=>b.type==='image/png')[0]`);const pngBlob=await blobData(pngUrl);await writeFile(out+'/frame-'+i+'-export.png',Buffer.from(pngBlob.data,'base64'));
-   await action('Generate Live Moment');if(i===1)await reward();await waitFor(`!!document.querySelector('.live-strip-preview canvas')`,'frame live preview',30000);
-   await delay(500);await writeFile(out+'/frame-'+i+'-live.png',Buffer.from(await evaluate(`document.querySelector('.live-strip-preview canvas').toDataURL().split(',')[1]`),'base64'));
-   const frameVideo=await exportVideo('Live Strip');assert(frameVideo.audio===0,'frame live audio');assert(Math.abs(frameVideo.photoPixel[0]-frameVideo.photoPixel[1])<8&&Math.abs(frameVideo.photoPixel[1]-frameVideo.photoPixel[2])<8,'Mono filter missing from motion '+JSON.stringify(frameVideo.photoPixel));
-   await close();await action('Edit Again');await route('/customize');
-   if(i<5)await click('[aria-label="Next frame"]');
- }
- await click('[aria-label="Add heart sticker"]');await click('.add-text');
- await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print ready');await delay(2200);assert(await evaluate(`location.pathname==='/print'&&qa.print===0`),'Print auto navigation/dialog');await click('.print-continuation a');await route('/results');
- await action('Download Photo');await waitFor(`document.querySelector('.preview-note').textContent.includes('Check your downloads')`,'PNG');
- const png=await evaluate(`(async()=>{const b=[...qa.urls.values()].find(b=>b.type==='image/png');const im=await createImageBitmap(b);const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const x=c.getContext('2d');x.drawImage(im,0,0);const alpha=x.getImageData(0,0,1,1).data[3];return {w:im.width,h:im.height,alpha};})()`);assert(png.h/png.w>3&&png.alpha<20,'custom alpha/aspect '+JSON.stringify(png));report.checks.push({png});
- await action('Generate Live Moment');await waitFor(`!!document.querySelector('.live-strip-preview canvas')`,'custom live preview',30000);await delay(500);
- const playing=await evaluate(`qa.videos.filter(v=>v.src&&v.readyState>=2&&!v.paused).map(v=>v.currentTime)`);assert(playing.length===4,'four segments not playing '+JSON.stringify(playing));assert(playing[3]-playing[0]>14,'slots do not seek to separate countdowns '+JSON.stringify(playing));
- const strip=await exportVideo('Live Strip');assert(strip.audio===0,'strip should be muted');
- const full=await exportVideo('Full Live Moment');assert(full.audio===1,'full audio missing');await close();
- await action('Edit Again');await route('/customize');await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print');await click('.print-continuation a');await route('/results');await action('Generate Live Moment');await waitFor(`!!document.querySelector('.video-output-tabs')`,'reward preserved');await close();
- await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','resource cleanup');
- }
- for(const [timer,count] of (process.env.M8_LONG_ONLY?[[10,12]]:[[1,4],[3,8],[5,8],[5,10],[5,12],[10,12]]))await captureSession(timer,count);
- await results();await action('Generate Live Moment');await reward();await waitFor(`!!document.querySelector('.live-strip-preview canvas')`,'12 long segments',30000);const large=await exportVideo('Live Strip');assert(large.audio===0,'12 strip audio');if(process.env.M8_LONG_ONLY){const long=await exportVideo('Full Live Moment');assert(long.audio===0,'silent long video');}await close();
- await captureSession(1,1,{flash:false,audio:'denied'});await results();await action('Generate Live Moment');await reward();const silent=await exportVideo('Full Live Moment');assert(silent.audio===0,'denied mic blocked video');await close();
- const unexpected=errors.filter(e=>!e.url?.includes('googlesyndication.com')&&!e.url?.includes('doubleclick.net'));assert(!unexpected.length,'browser errors '+JSON.stringify(unexpected));
- console.log('M8 PASS',JSON.stringify({checks:report.checks.length,exports:report.exports,layouts:report.layouts.length}));
-}finally{await writeFile(out+(process.env.M8_LONG_ONLY?'/report-long.json':'/report.json'),JSON.stringify(report,null,2));browser.kill();for(const promise of pending.values())clearTimeout(promise.timer);}
+ const photoSelector=i=>`.customize-preview [aria-label="Adjust photo ${i}"]`;
+ const photoGeometry=()=>evaluate(`[...document.querySelectorAll('.customize-preview image[data-filter]')].map(e=>['x','y','width','height'].map(a=>Number(e.getAttribute(a))))`);
+ const zoom=async value=>{await evaluate(`(()=>{const e=document.querySelector('[aria-label="Photo zoom"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${value});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);await delay(60);await evaluate(`document.querySelector('[aria-label="Photo zoom"]').dispatchEvent(new Event('pointerup',{bubbles:true}))`);await delay(60);};
+ const drag=async(index,dx,dy,touch=false)=>{
+  const b=await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(photoSelector(index))});e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+  if(touch){await cdp('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...b,id:0}]});for(let i=1;i<=5;i++)await cdp('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:b.x+dx*i/5,y:b.y+dy*i/5,id:0}]});await cdp('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});}
+  else {await cdp('Input.dispatchMouseEvent',{type:'mouseMoved',...b});await delay(40);await cdp('Input.dispatchMouseEvent',{type:'mousePressed',...b,button:'left',clickCount:1});for(let i=1;i<=5;i++)await cdp('Input.dispatchMouseEvent',{type:'mouseMoved',x:b.x+dx*i/5,y:b.y+dy*i/5,buttons:1});await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',x:b.x+dx,y:b.y+dy,button:'left',clickCount:1});}await delay(120);
+ };
+ await evaluate(`qa.pointerEvents=[];for(const type of ['pointerdown','pointermove','pointerup','pointercancel','lostpointercapture'])document.addEventListener(type,e=>{qa.pointerEvents.push({type,target:e.target.getAttribute('aria-label'),button:e.button,buttons:e.buttons,x:e.clientX,y:e.clientY});},true);`);
+ const baseline=await photoGeometry();await click(photoSelector(1));await zoom(1.7);const zoomed=await photoGeometry();
+ assert(zoomed[0][2]>baseline[0][2]&&JSON.stringify(zoomed.slice(1))===JSON.stringify(baseline.slice(1)),'zoom independence');
+ await drag(1,20,-12);const moved=await photoGeometry();assert(JSON.stringify(moved[0])!==JSON.stringify(zoomed[0]),'drag did not move '+JSON.stringify({baseline,zoomed,moved,diag:await evaluate(`(()=>{const e=document.querySelector('[aria-label="Adjust photo 1"]'),r=e.getBoundingClientRect();return {events:qa.pointerEvents,pressed:e.getAttribute('aria-pressed'),rect:r.toJSON(),hit:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.outerHTML}})()`)}));
+ await click('[aria-label="Undo"]');assert(JSON.stringify(await photoGeometry())===JSON.stringify(zoomed),'one drag one undo');
+ await click('[aria-label="Redo"]');assert(JSON.stringify(await photoGeometry())===JSON.stringify(moved),'redo');
+ await click(photoSelector(1));await textButton('Reset Photo');assert(JSON.stringify(await photoGeometry())===JSON.stringify(baseline),'reset photo');
+ for(let i=1;i<=4;i++){await click(photoSelector(i));await zoom(1+i*.15);await drag(i,8,-5);}
+ await textButton('Done');for(let i=0;i<9;i++)await click('[aria-label="Next frame"]');
+ await click(photoSelector(1));await zoom(2);await drag(1,10,10);await textButton('Done');
+ assert(await evaluate(`document.querySelector('.photo-adjust-help')?.textContent.includes('zoom slider')`),'adjustment guidance missing');
+ assert(await evaluate(`document.querySelectorAll('.frame-picker image,.frame-picker img').length===0&&document.querySelector('.frame-outline > rect').getAttribute('fill')==='#000000'`),'selector must be an empty black frame');
+ const frameA=await photoGeometry();await click('[aria-label="Next frame"]');await click('[aria-label="Previous frame"]');assert(JSON.stringify(await photoGeometry())===JSON.stringify(frameA),'frame switch discarded adjustments');
+ await click('[aria-label="Add heart sticker"]');await textButton('Done');assert(JSON.stringify(await photoGeometry())===JSON.stringify(frameA),'sticker changed photo');
+ for(const width of [320,390,768,844,1366,1440]){await layout(width,width===844?390:1024,true);const aligned=await evaluate(`(()=>{const p=document.querySelector('.customize-panel').getBoundingClientRect(),h=document.querySelector('.customize-heading').getBoundingClientRect(),a=document.querySelector('.frame-picker').getBoundingClientRect(),b=document.querySelector('.customize-tools').getBoundingClientRect();const center=innerWidth>800?(a.left+b.right)/2:p.x+p.width/2;return Math.abs(center-h.x-h.width/2)})()`);assert(aligned<1,'heading off center '+width);const buttons=await evaluate(`(()=>{const a=document.querySelector('.add-text').getBoundingClientRect(),b=document.querySelector('.print-action').getBoundingClientRect();return {width:Math.abs(a.width-b.width),height:Math.abs(a.height-b.height),y:Math.abs(a.y-b.y)}})()`);assert(buttons.width<1&&buttons.height<1&&(width<=800||buttons.y<1),'action buttons mismatch '+JSON.stringify(buttons));}
+ if(!process.env.M95_LAYOUT_ONLY){
+ await cdp('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});await layout(390,844);await click(photoSelector(1));const beforeTouch=await photoGeometry();await drag(1,-12,10,true);assert(JSON.stringify(await photoGeometry())!==JSON.stringify(beforeTouch),'touch drag');await textButton('Done');await layout(1440);
+ // Rasterize the actual SVG preview at export size; compare pixels with downloaded PNG.
+ await evaluate(`(async()=>{window.qa.expected=document.querySelector('.customize-preview svg').cloneNode(true);qa.expected.querySelector('.editor-layer').remove();for(const e of qa.expected.querySelectorAll('image')){const b=await (await fetch(e.getAttribute('href'))).blob();e.setAttribute('href',await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)}));}})()`);
+ const saved=await photoGeometry();await click('.print-action');await route('/print');await waitFor(`!!document.querySelector('.print-continuation a')`,'print');assert(await evaluate(`document.querySelector('.printing-panel .doodle').getAttribute('src').includes('hearts')`),'print hearts');await click('.print-continuation a');await route('/results');await action('Download Photo');await waitFor(`document.querySelector('.preview-note').textContent.includes('Check your downloads')`,'PNG');
+ const pixels=await evaluate(`(async()=>{const blob=[...qa.urls.values()].find(b=>b.type==='image/png');const im=await createImageBitmap(blob);const actual=document.createElement('canvas');actual.width=im.width;actual.height=im.height;const ac=actual.getContext('2d');ac.drawImage(im,0,0);im.close();const svg=qa.expected;svg.setAttribute('xmlns','http://www.w3.org/2000/svg');svg.setAttribute('width',actual.width);svg.setAttribute('height',actual.height);svg.removeAttribute('class');for(const e of svg.querySelectorAll('image')){const b=await (await fetch(e.getAttribute('href'))).blob();e.setAttribute('href',await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)}));}const image=new Image();image.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svg))));await image.decode();const expected=document.createElement('canvas');expected.width=actual.width;expected.height=actual.height;const ec=expected.getContext('2d');ec.drawImage(image,0,0);let total=0,n=0;for(let y=120;y<actual.height-120;y+=37)for(let x=180;x<actual.width-180;x+=31){const a=ac.getImageData(x,y,1,1).data,b=ec.getImageData(x,y,1,1).data;if(a[3]<250||b[3]<250)continue;for(let c=0;c<3;c++){total+=Math.abs(a[c]-b[c]);n++;}}return {width:actual.width,height:actual.height,meanError:total/n};})()`);
+ assert(pixels.width>=1000&&pixels.meanError<9,'PNG differs from SVG '+JSON.stringify(pixels));report.checks.push({pngComparison:pixels});
+ console.log('PASS editor and PNG',JSON.stringify(pixels));await action('Generate Live Moment');await reward();await waitFor(`!!document.querySelector('.live-strip-preview canvas')`,'live preview',30000);await exportVideo('Live Strip');await close();
+ await action('Generate GIF');await waitFor(`!!document.querySelector('dialog img')`,'GIF',30000);await close();
+ console.log('PASS GIF and Live Strip');await action('Edit Again');await route('/customize');await waitFor(`document.querySelectorAll('.customize-preview image[data-filter]').length===4`,'restored photos');assert(JSON.stringify(await photoGeometry())===JSON.stringify(saved),'Edit Again lost transforms');
+ await click('.back-link');await route('/capture');await textButton('Restart');await waitCount(0);await click('.camera-empty button');await waitFor(`document.querySelector('video')?.readyState>=2&&!document.querySelector('.camera-empty')`,'camera after restart');await click('.capture-actions button:last-child');await waitCount(1);await idle();
+ // Fill remaining slots with portrait/landscape uploads.
+ await evaluate(`(async()=>{const d=new DataTransfer();for(let i=0;i<3;i++){const c=document.createElement('canvas');c.width=i%2?1600:900;c.height=i%2?900:1600;const x=c.getContext('2d');const g=x.createLinearGradient(0,0,c.width,c.height);g.addColorStop(0,'#d04020');g.addColorStop(.5,'#20a070');g.addColorStop(1,'#3040d0');x.fillStyle=g;x.fillRect(0,0,c.width,c.height);d.items.add(new File([await new Promise(r=>c.toBlob(r,'image/png'))],'source'+i+'.png',{type:'image/png'}));}const e=document.querySelector('input[type=file]');e.files=d.files;e.dispatchEvent(new Event('change',{bubbles:true}));})()`);await waitCount(4);await click('.choose-frame');await route('/customize');assert(await evaluate(`document.querySelectorAll('[data-decoration-id]').length===0`),'restart stickers');
+ for(let i=1;i<=4;i++){await click(photoSelector(i));assert(await evaluate(`Number(document.querySelector('[aria-label="Photo zoom"]').value)===1`),'restart crop');await zoom(4);await drag(i,200,-200);await textButton('Reset Photo');}
+ await textButton('Done');await click('.print-action');await waitFor(`!!document.querySelector('.print-continuation a')`,'print');await click('.print-continuation a');await route('/results');await action('Take Another');await route('/camera');await waitFor('qa.urls.size===0','session release');
+ console.log('PASS restart, uploads, zoom boundaries and Take Another');await captureSession(3,8);await click('.choose-frame');await route('/customize');await click(photoSelector(8));await zoom(1.8);await drag(8,10,-5);await textButton('Done');await layout(390,844);await layout(1440);
+ await captureSession(3,12);await captureSession(1,1,{flash:false});
+ await start(1,1,'off',false);await click('.capture-actions button:last-child');await waitCount(1);await idle();assert(await evaluate('qa.sounds.length===0'),'sound toggle');
+ await cdp('Page.navigate',{url:origin+'/faq'});await waitFor(`!!document.querySelector('summary')`,'FAQ');await evaluate(`document.querySelectorAll('summary')[0].click();document.querySelectorAll('summary')[1].click()`);assert(await evaluate(`document.querySelectorAll('details[open]').length===1`),'exclusive FAQ');await evaluate(`document.querySelectorAll('summary')[1].click()`);assert(await evaluate(`!document.querySelector('details[open]')`),'FAQ close');
+ assert(!errors.length,'browser errors '+JSON.stringify(errors));console.log('M9.5 PASS',JSON.stringify({checks:report.checks.length,pixels,layouts:report.layouts.length,exports:report.exports}));
+ }else{assert(!errors.length,'browser errors '+JSON.stringify(errors));console.log('M9.5 layout PASS',report.layouts.length);}
+}finally{await writeFile(out+(process.env.M95_LAYOUT_ONLY?'/layout-report.json':'/report.json'),JSON.stringify(report,null,2));browser.kill();for(const promise of pending.values())clearTimeout(promise.timer);}

@@ -1,3 +1,4 @@
+import type { PhotoAdjustment, NormalizedCrop } from '../editor/photo-geometry';
 import type { FilterId, FrameColor, PhotoCount, StickerKind, TimerSeconds } from "../design-data";
 import type { FrameStyle } from "../frame-templates";
 
@@ -23,6 +24,8 @@ export type Capture = {
   still: MediaReference;
   motion?: { media: MediaReference; startMs?: number; sourceDurationMs?: number; durationMs: number; hasAudio: boolean; mirrored: boolean; crop: { x: number; y: number; width: number; height: number } };
   mirrorApplied?: boolean;
+  initialCrop?: NormalizedCrop;
+  flashExposure?: boolean;
   capturedAt: number;
   filterAtCapture: FilterId;
 };
@@ -48,6 +51,7 @@ export type Customization = {
   filterId: FilterId;
   frameId: FrameStyle;
   frameColor: FrameColor;
+  photoAdjustments: Readonly<Record<string, PhotoAdjustment>>;
   stickers: readonly PlacedSticker[];
   texts: readonly PlacedText[];
 };

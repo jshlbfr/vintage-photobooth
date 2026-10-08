@@ -79,9 +79,16 @@ export function processPixels(data: Uint8ClampedArray, width: number, height: nu
   return data;
 }
 /** Same pixel engine at any requested resolution; callers choose their preview budget. */
-export function gradeCanvas(canvas: HTMLCanvasElement | OffscreenCanvas, id: FilterId, seed = 17) {
-  if(id==='original')return;
+export function gradeCanvas(canvas: HTMLCanvasElement | OffscreenCanvas, id: FilterId, seed = 17, flashExposure = false) {
+  if(id==='original'&&!flashExposure)return;
   const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)return;
   const frame=ctx.getImageData(0,0,canvas.width,canvas.height);
+  if(flashExposure) applyFlashExposure(frame.data);
   processPixels(frame.data,frame.width,frame.height,id,seed);ctx.putImageData(frame,0,0);
+}
+
+/** Gentle midtone lift with fixed black/white endpoints; original source stays intact. */
+export function applyFlashExposure(data: Uint8ClampedArray) {
+  for(let i=0;i<data.length;i+=4) for(let c=0;c<3;c++){const v=data[i+c]/255;data[i+c]=255*(v+.18*v*(1-v));}
+  return data;
 }

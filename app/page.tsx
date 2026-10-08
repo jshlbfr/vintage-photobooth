@@ -7,7 +7,7 @@ import { ContentAds } from '@/components/content/content-ads';
 import { contentMetadata } from '@/lib/site';
 export const metadata = contentMetadata('Vintage Photobooth — make a memory', 'Take vintage-inspired photo strips in your browser. Explore filters, custom frames, local photo processing and free PNG downloads.', '/');
 export default function LandingPage() {
-  return <><SiteHeader/><main id="main-content"><section className="landing" aria-label="Step inside the photobooth">
+  return <><SiteHeader landing/><main id="main-content"><section className="landing" aria-label="Step inside the photobooth">
     <LandingArtwork />
     <div className="landing-content">
       <Doodle kind="rays" className="landing-title-rays" />

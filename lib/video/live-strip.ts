@@ -23,13 +23,13 @@ export async function createLiveStrip(composition:StripComposition,sources:(Moti
       ctx.save();ctx.scale(canvas.width/layout.width,canvas.height/layout.height);
       for(const e of entries){
         const filter=e.source.capture.filterAtCapture;
-        if(filter!=='original'&&e.video.readyState>=2&&e.time!==e.video.currentTime){
+        if((filter!=='original'||e.source.capture.flashExposure)&&e.video.readyState>=2&&e.time!==e.video.currentTime){
           const width=Math.min(e.video.videoWidth,entries.length>4?192:320),height=Math.round(e.video.videoHeight*width/e.video.videoWidth);
           if(e.work.width!==width||e.work.height!==height){e.work.width=width;e.work.height=height;}
           e.work.getContext('2d',{willReadFrequently:true})!.drawImage(e.video,0,0,width,height);
-          gradeCanvas(e.work,filter);e.time=e.video.currentTime;
+          gradeCanvas(e.work,filter,17,e.source.capture.flashExposure);e.time=e.video.currentTime;
         }
-        drawMotion(ctx,e.video,e.source.capture,layout.slots[e.index],filter==='original'?undefined:e.work);
+        drawMotion(ctx,e.video,e.source.capture,layout.slots[e.index],filter==='original'&&!e.source.capture.flashExposure?undefined:e.work,composition.photos[e.index].adjustment,true);
       }
       ctx.restore();ctx.drawImage(overlay!,0,0);
     };

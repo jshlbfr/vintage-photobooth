@@ -5,6 +5,7 @@ import { useEffect, useId, useState, type ReactNode, type Ref, type PointerEvent
 import { DecorationArt } from "@/components/editor/decoration-art";
 import { orderedElements } from "@/lib/editor/geometry";
 import { getStripLayout, type StripComposition } from "@/lib/composition";
+import { photoImageRect } from '@/lib/editor/photo-geometry';
 import { getFrameTemplate } from "@/lib/frame-templates";
 
 /** One view for capture, customize, print, results, and decorative sample strips. */
@@ -23,7 +24,7 @@ export function PhotoStrip({ composition, empty = false, className = "", label =
       <defs><clipPath id={`${id}-slot-${index}`}><rect {...slot} rx={slot.radius} /></clipPath></defs>
       <rect {...slot} rx={slot.radius} fill={empty || !composition.photos[index]?.src ? "#e7ddc8" : "#050403"} />
       {!empty && composition.photos[index]?.src && <g clipPath={`url(#${id}-slot-${index})`}>
-        <FilteredPhoto src={composition.photos[index].src} filterId={composition.photos[index].filterId ?? "original"} {...slot} preserveAspectRatio={composition.photos[index].fit === "contain" ? "xMidYMid meet" : "xMidYMid slice"} />
+        <FilteredPhoto src={composition.photos[index].src} filterId={composition.photos[index].filterId ?? "original"} flashExposure={composition.photos[index].flashExposure} {...(composition.photos[index].width && composition.photos[index].height && composition.photos[index].fit !== "contain" ? photoImageRect(composition.photos[index].width!,composition.photos[index].height!,slot,composition.photos[index].adjustment,composition.photos[index].initialCrop) : slot)} preserveAspectRatio={composition.photos[index].fit === "contain" ? "xMidYMid meet" : "xMidYMid slice"} />
       </g>}
     </g>)}
     {artwork?.layer === "overlay" && frameImage}
