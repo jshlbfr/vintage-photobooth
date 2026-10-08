@@ -167,3 +167,7 @@ Personal project exploring creative web development, interactive media, UI/UX de
 ---
 
 *Made for moments worth keeping.*
+
+---
+
+Note: Google AdSense approval has not yet been obtained, and the website is not currently generating revenue through AdSense. Monetization remains an ongoing exploration rather than an established feature.
