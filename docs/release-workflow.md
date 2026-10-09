@@ -1,7 +1,9 @@
 # Controlled Preview and production releases
 
-M9.5 work uses `milestone-9-5`. The current production baseline is `2fd720c` on
-`main`. Routine progress must never be pushed directly to `main`.
+M9.5 work uses `milestone-9-5`. The implementation audit baseline was `2fd720c`
+on `main`; subsequent manual README changes through `091531f` are preserved.
+This baseline is historical, not a claim about the currently served production
+deployment. Routine progress must never be pushed directly to `main`.
 
 ## Progress and Preview
 

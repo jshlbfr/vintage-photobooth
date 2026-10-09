@@ -1,6 +1,7 @@
 # Milestone 9.5 — implementation and release report
 
-Implementation branch: `milestone-9-5`. Production baseline: `2fd720c` on `main`.
+Implementation branch: `milestone-9-5`. Audit baseline: `2fd720c` on `main`.
+The later manual README updates through `091531f` are preserved in this branch.
 The current repository was audited first, and the user approved implementation.
 The subsequent Customize layout correction takes precedence over the original
 request to center the desktop heading across the whole panel.
@@ -154,9 +155,12 @@ reward-provider or Full Live Moment export implementation was replaced.
   five custom frames, Full Live Moment with/without audio, continuous 4/8/10/12
   capture, and 12 photos at a ten-second timer (~12 MB source recording).
   The separate extended Full Live Moment stress variant was not rerun.
-- Final revised-layout acceptance passes. Remote CI/Preview status will be
-  checked after the feature-branch push; production promotion is not authorized
-  as part of that push.
+- Final revised-layout acceptance passes. Implementation commit `73ea33d` passed
+  [remote CI](https://github.com/jshlbfr/vintage-photobooth/actions/runs/37829263036)
+  and deployed successfully to Vercel with environment **Preview**. The
+  [Preview](https://vintage-photobooth-5tzy18h2p-jshlbfr.vercel.app) requires Vercel
+  sign-in, so its application response was not inspected anonymously.
+  No production promotion or account-setting change was performed.
 
 ## 18–19. Limits and operator actions
 
