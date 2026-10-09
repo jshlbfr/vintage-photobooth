@@ -137,13 +137,13 @@ reward-provider or Full Live Moment export implementation was replaced.
   mirrored video crops, Full Live Moment isolation and bounded flash exposure.
 - Lint and TypeScript pass. Optimized Webpack production build passes.
 - Production dependency audit: zero vulnerabilities.
-- Initial M9.5 browser acceptance: 50 viewport checks; drag/zoom/reset/Undo/Redo,
+- M9.5 browser acceptance: 50 viewport checks; drag/zoom/reset/Undo/Redo,
   touch input, frame changes, stickers, Print/Results/Edit Again, fresh sessions,
   portrait/landscape uploads, GIF and Live Strip export, exclusive FAQ, sound mute,
-  manual and continuous capture pass. The latest layout correction is being
-  revalidated before publication.
+  manual and continuous capture pass. The final spacing/button correction additionally passes 14 focused viewport
+  checks, including equal action sizes/baselines and left-area header centering.
 - Actual Customize SVG versus 1291×4096 downloaded PNG: sampled RGB mean absolute
-  error 0.55 levels (0–255 scale). Geometry matches; preview resampling/JPEG and
+  error 0.54 levels (0–255 scale). Geometry matches; preview resampling/JPEG and
   output resolution account for small pixel differences.
 - M9 HTTP and sharing fixture regressions pass, including exact ten-minute expiry,
   authentication, same-origin checks, PNG validation, cleanup and outage behavior.
@@ -154,8 +154,9 @@ reward-provider or Full Live Moment export implementation was replaced.
   five custom frames, Full Live Moment with/without audio, continuous 4/8/10/12
   capture, and 12 photos at a ten-second timer (~12 MB source recording).
   The separate extended Full Live Moment stress variant was not rerun.
-- Final revised-layout acceptance and remote Preview verification are pending at
-  report draft.
+- Final revised-layout acceptance passes. Remote CI/Preview status will be
+  checked after the feature-branch push; production promotion is not authorized
+  as part of that push.
 
 ## 18–19. Limits and operator actions
 
