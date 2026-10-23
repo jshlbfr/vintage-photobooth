@@ -101,11 +101,9 @@ try {
  await cdp('Runtime.evaluate',{expression:`[...document.querySelectorAll('.result-action')].find(b=>b.textContent.includes('Download Photo')).click()`,userGesture:true});
  await waitFor('document.querySelector(".preview-note").textContent.includes("Check your downloads")');
  assert(await evaluate('!window.__m9AdLoaded && !document.querySelector("script[src*=googlesyndication]")'),'complete free flow ad-free');
- if(!['localhost','127.0.0.1'].includes(new URL(origin).hostname)){
-  await evaluate(`[...document.querySelectorAll('.result-action')].find(b=>b.textContent.includes('Generate GIF')).click()`);await waitFor('document.body.innerText.includes("Rewards are not available yet")');
-  assert(await evaluate('!document.body.innerText.includes("Complete development reward")'),'production rewards fail closed');
- }
- report.checks.push('synthetic camera → capture → edit → Print → Results → free PNG; optional microphone; production reward denial');
+ await evaluate(`[...document.querySelectorAll('.result-action')].find(b=>b.textContent.includes('Generate GIF')).click()`);await waitFor('!!document.querySelector("dialog img")');
+ assert(await evaluate('!document.body.innerText.includes("Unlock enhanced memories")'),'temporary reward gate is hidden');
+ report.checks.push('synthetic camera → capture → edit → Print → Results → free PNG and GIF; optional microphone; temporary reward bypass');
  for(const path of ['/capture','/customize','/print','/results','/share/invalid','/missing-m9-page']){
   await cdp('Page.navigate',{url:origin+path});await delay(900);assert(await evaluate('!window.__m9AdLoaded && !document.querySelector("script[src*=googlesyndication]")'),path+' ad-free');report.checks.push(path+' ad-free');
  }

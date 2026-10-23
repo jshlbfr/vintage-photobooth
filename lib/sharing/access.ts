@@ -1,5 +1,6 @@
 import 'server-only';
 import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
+import {rewardUnlockRequired} from '@/lib/rewards/access';
 const devSecret=randomBytes(32).toString('hex');
 export function localRuntime(){return !process.env.VERCEL&&!process.env.VERCEL_ENV&&(process.env.NODE_ENV==='development'||process.env.REWARD_LOCAL_TEST==='true');}
 export function localDevelopment(request:Request){
@@ -28,4 +29,16 @@ export function receiptOwner(token:string,allowDevelopment=false){
     const value=JSON.parse(Buffer.from(data,'base64url').toString());if(typeof value.sessionId!=='string'||!Number.isFinite(value.expires)||value.expires<=Date.now()||value.adapter!=='development'||!allowDevelopment)return null;
     return createHmac('sha256',secret()).update(value.sessionId).digest('hex');
   }catch{return null;}
+}
+
+/** Rate-limit key for the temporary no-reward sharing path; it is not an account identity. */
+export function sessionOwner(sessionId:string){
+  if(!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(sessionId))return null;
+  return createHmac('sha256',secret()).update(sessionId).digest('hex');
+}
+
+export function shareOwner(request:Request){
+  return rewardUnlockRequired()
+    ? receiptOwner(request.headers.get('authorization')?.replace(/^Bearer /,'')??'',localDevelopment(request))
+    : sessionOwner(request.headers.get('x-photobooth-session')??'');
 }

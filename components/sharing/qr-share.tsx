@@ -5,6 +5,7 @@ import {usePhotoBoothSession} from '@/components/session/session-provider';
 import {useMedia,useStripComposition} from '@/components/media/media-provider';
 import {renderStrip} from '@/lib/render/strip-renderer';
 import {MAX_SHARE_BYTES} from '@/lib/sharing/policy';
+import {rewardUnlockRequired} from '@/lib/rewards/access';
 type Share={id:string;url:string;expiresAt:string;serverNow:number};
 function QR({url}:{url:string}){
   const code=qrcode(0,'M');code.addData(url);code.make();const size=code.getModuleCount(),cells=[];
@@ -24,7 +25,7 @@ export function QRShare(){
       if(!blob){const result=await renderStrip(composition,controller.signal);blob=result.blob;controller.signal.throwIfAborted();const reference=store.add(blob,result.width,result.height);if(reference.kind==='local')dispatch({type:'outputs/record',kind:'photo',output:{resourceId:reference.resourceId,mimeType:'image/png',createdAt:Date.now()}});}
       if(blob.size>MAX_SHARE_BYTES)throw new Error('This PNG is too large for QR sharing (4 MB maximum). Download Photo still saves the full-resolution strip.');
       setMessage('Creating your temporary share…');
-      const response=await fetch('/api/shares',{method:'POST',headers:{'Content-Type':'image/png',Authorization:`Bearer ${session.rewards.shareReceipt??''}`},body:blob,signal:controller.signal});const data=await response.json();if(!response.ok)throw new Error(data.error??'Sharing failed. Please try again.');
+      const headers={'Content-Type':'image/png','X-Photobooth-Session':session.id,...(rewardUnlockRequired()?{Authorization:`Bearer ${session.rewards.shareReceipt??''}`}:{})};const response=await fetch('/api/shares',{method:'POST',headers,body:blob,signal:controller.signal});const data=await response.json();if(!response.ok)throw new Error(data.error??'Sharing failed. Please try again.');
       setShare({...data,url:new URL(data.url,location.origin).href});setMessage('Anyone with this link can download the strip until it expires.');
     }catch(error){if(!controller.signal.aborted)setMessage(error instanceof Error?error.message:'Sharing failed. Your photos are still on this device.');}
     finally{operation.current=null;if(!controller.signal.aborted)setBusy(false);}

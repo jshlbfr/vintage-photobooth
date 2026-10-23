@@ -7,7 +7,7 @@ registerHooks({resolve(specifier,context,next){
   if(specifier.startsWith('@/'))return next(new URL('../'+specifier.slice(2)+'.ts',import.meta.url).href,context);
   return next(specifier,context);
 }});
-const {localDevelopment,sameOrigin,issueReceipt,receiptOwner}=await import('../lib/sharing/access.ts');
+const {localDevelopment,sameOrigin,issueReceipt,receiptOwner,sessionOwner,shareOwner}=await import('../lib/sharing/access.ts');
 const {boundedBody,ShareError}=await import('../lib/sharing/http.ts');
 const {BurstLimiter}=await import('../lib/sharing/burst-limit.ts');
 const {MAX_SHARE_BYTES}=await import('../lib/sharing/policy.ts');
@@ -37,6 +37,10 @@ test('reward requests reject null, arrays, invalid IDs and extra fields without 
 });
 test('signed receipt requires explicit dev permission and rejects modifications',()=>{
  local();const token=issueReceipt(crypto.randomUUID());assert.ok(receiptOwner(token,true));assert.equal(receiptOwner(token),null);assert.equal(receiptOwner(token+'x',true),null);assert.equal(receiptOwner('x'.repeat(2049),true),null);
+});
+test('temporary no-reward sharing derives a bounded owner from a valid session ID',()=>{
+ local();delete process.env.NEXT_PUBLIC_REWARD_UNLOCK_REQUIRED;const sessionId=crypto.randomUUID();const request=new Request(origin,{headers:{'X-Photobooth-Session':sessionId}});assert.equal(shareOwner(request),sessionOwner(sessionId));assert.equal(shareOwner(new Request(origin)),null);
+ process.env.NEXT_PUBLIC_REWARD_UNLOCK_REQUIRED='true';const receipt=issueReceipt(sessionId);assert.equal(shareOwner(new Request(origin,{headers:{Authorization:`Bearer ${receipt}`}})),receiptOwner(receipt,true));delete process.env.NEXT_PUBLIC_REWARD_UNLOCK_REQUIRED;
 });
 test('body byte limit applies without Content-Length and cancels the stream',async()=>{
  let cancelled=false;const stream=new ReadableStream({start(c){c.enqueue(new Uint8Array(513));},cancel(){cancelled=true;}});

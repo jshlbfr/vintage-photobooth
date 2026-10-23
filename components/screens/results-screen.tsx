@@ -1,7 +1,7 @@
 "use client";
 
-import { RewardDialog } from '@/components/rewards/reward-dialog';
 import { QRShare } from '@/components/sharing/qr-share';
+import { RewardDialog } from '@/components/rewards/reward-dialog';
 import { VideoResults } from '@/components/media/video-results';
 import { useState } from 'react';
 import { useGif } from '@/components/media/use-gif';
@@ -14,6 +14,7 @@ import { ResultAction } from "@/components/photobooth/result-action";
 import { Doodle } from "@/components/artwork/doodle";
 import { usePhotoBoothSession } from "@/components/session/session-provider";
 import { useStripComposition } from "@/components/media/media-provider";
+import { rewardUnlockRequired } from '@/lib/rewards/access';
 
 export function ResultsScreen() {
   const { startSession, session, dispatch } = usePhotoBoothSession();
@@ -21,7 +22,7 @@ export function ResultsScreen() {
   const [media,setMedia]=useState<'gif'|'live'|'qr'|null>(null);
   const [pending,setPending]=useState<'gif'|'live'|'qr'|null>(null);
   const open=(kind:'gif'|'live'|'qr')=>{setMedia(kind);if(kind==='gif')void gif.generate();};
-  const enhanced=(kind:'gif'|'live'|'qr')=>{if(session.rewards.enhancedFeaturesUnlocked)open(kind);else setPending(kind);};
+  const enhanced=(kind:'gif'|'live'|'qr')=>rewardUnlockRequired()&&!session.rewards.enhancedFeaturesUnlocked?setPending(kind):open(kind);
   const close=()=>{gif.cancel();setMedia(null);};
   const composition = useStripComposition();
   return <><Panel className="results-panel" labelledBy="results-title">

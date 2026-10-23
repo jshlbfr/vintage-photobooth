@@ -1,5 +1,5 @@
 import {randomBytes} from 'node:crypto';
-import {sameOrigin,receiptOwner,localDevelopment} from '@/lib/sharing/access';
+import {sameOrigin,shareOwner} from '@/lib/sharing/access';
 import {PRIVATE_HEADERS} from '@/lib/sharing/policy';
 import {readStrip} from '@/lib/sharing/upload';
 import {shareStore,type ShareRow} from '@/lib/sharing/supabase';
@@ -8,8 +8,8 @@ import {sharingBursts} from '@/lib/sharing/burst-limit';
 export const runtime='nodejs';
 export async function POST(request:Request){
   if(!sameOrigin(request))return Response.json({error:'This share request is not allowed.'},{status:403,headers:PRIVATE_HEADERS});
-  const owner=receiptOwner(request.headers.get('authorization')?.replace(/^Bearer /,'')??'',localDevelopment(request));
-  if(!owner)return Response.json({error:'Complete a reward before sharing.'},{status:403,headers:PRIVATE_HEADERS});
+  const owner=shareOwner(request);
+  if(!owner)return Response.json({error:'This share request is not allowed.'},{status:403,headers:PRIVATE_HEADERS});
   let bytes;try{
     if(!sharingBursts.take('create:global',60)||!sharingBursts.take('create:'+owner,12))throw new ShareError(429,'Too many share attempts. Please wait before trying again.');
     bytes=await readStrip(request);
